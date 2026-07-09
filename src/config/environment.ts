@@ -14,6 +14,7 @@ export interface EnvironmentConfig {
     smsMarketing: boolean;
     analytics: boolean;
     autoSelectMissingPlatformSettings: boolean;
+    bundleTagScores: boolean;
   };
 
   // API endpoints (same for all configurations)
@@ -44,6 +45,9 @@ export interface EnvironmentConfig {
       get: string;
       create: string;
       update: string;
+      requestTagEvaluation: string;
+      tagEvaluationStatus: string;
+      tagScores: string;
     };
     wallet: {
       balance: string;
@@ -85,6 +89,18 @@ export interface EnvironmentConfig {
   };
 }
 
+export const BUNDLE_TAG_SCORES_FEATURE_FLAG_KEY = 'feature_bundle_tag_scores';
+
+const isLocalStorageFeatureEnabled = (key: string): boolean => {
+  if (typeof window === 'undefined') return false;
+
+  try {
+    return window.localStorage.getItem(key) === 'true';
+  } catch {
+    return false;
+  }
+};
+
 const localConfig: EnvironmentConfig = {
   domain: 'localhost',
   baseUrl: 'http://localhost:8081',
@@ -99,6 +115,9 @@ const localConfig: EnvironmentConfig = {
     autoSelectMissingPlatformSettings:
       process.env.REACT_APP_ENABLE_AUTO_SELECT_MISSING_PLATFORM_SETTINGS !==
       'false',
+    bundleTagScores: isLocalStorageFeatureEnabled(
+      BUNDLE_TAG_SCORES_FEATURE_FLAG_KEY
+    ),
   },
 
   endpoints: {
@@ -128,6 +147,9 @@ const localConfig: EnvironmentConfig = {
       get: '/bundles/:id',
       create: '/bundles',
       update: '/bundles/:id',
+      requestTagEvaluation: '/bundles/:id/tag-evaluations',
+      tagEvaluationStatus: '/bundles/:id/tag-evaluation',
+      tagScores: '/bundles/:id/tag-scores',
     },
     wallet: {
       balance: '/wallet/balance',
