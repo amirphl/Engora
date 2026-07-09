@@ -232,6 +232,26 @@ export const ERROR_MESSAGES: Record<string, ErrorMessage> = {
     en: 'Failed to retrieve bundles',
     fa: 'دریافت کمپین‌ها ناموفق بود',
   },
+  SMART_TAG_EVALUATION_DISABLED: {
+    en: 'Smart tag evaluation is currently unavailable',
+    fa: 'ارزیابی هوشمند برچسب‌ها در حال حاضر در دسترس نیست',
+  },
+  BUNDLE_TAG_EVALUATION_ACTIVE: {
+    en: 'Tag evaluation is already in progress for this bundle',
+    fa: 'ارزیابی برچسب‌ها برای این کمپین در حال انجام است',
+  },
+  REQUEST_BUNDLE_TAG_EVALUATION_FAILED: {
+    en: 'Failed to start tag evaluation. Please try again',
+    fa: 'شروع ارزیابی برچسب‌ها ناموفق بود. لطفاً دوباره تلاش کنید',
+  },
+  GET_BUNDLE_TAG_EVALUATION_STATUS_FAILED: {
+    en: 'Failed to retrieve the tag evaluation status',
+    fa: 'دریافت وضعیت ارزیابی برچسب‌ها ناموفق بود',
+  },
+  LIST_BUNDLE_TAG_SCORES_FAILED: {
+    en: 'Failed to retrieve the tag scores',
+    fa: 'دریافت امتیازهای برچسب‌ها ناموفق بود',
+  },
   INVALID_PAGE: {
     en: 'Invalid page number provided',
     fa: 'شماره صفحه نامعتبر است',
