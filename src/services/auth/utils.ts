@@ -1,10 +1,10 @@
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PHONE_REGEX = /^[+\d]+$/;
+const IRANIAN_MOBILE_REGEX = /^(?:\+98|0098|98|0)?9\d{9}$/;
 
 export const normalizeIdentifierInput = (value: string): string => value.trim();
 
 export const isPhoneLikeIdentifier = (value: string): boolean =>
-  PHONE_REGEX.test(normalizeIdentifierInput(value));
+  IRANIAN_MOBILE_REGEX.test(normalizeIdentifierInput(value));
 
 export const isValidEmailIdentifier = (value: string): boolean =>
   EMAIL_REGEX.test(normalizeIdentifierInput(value));
