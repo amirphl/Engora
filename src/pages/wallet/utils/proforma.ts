@@ -82,10 +82,6 @@ export const buildProformaHtml = (raw: ProformaData, language: string) => {
   const isFa = locale === 'fa';
   const copy = getWalletCopy(locale).proforma;
   const dir = isFa ? 'rtl' : 'ltr';
-  const textAlign = isFa ? 'right' : 'left';
-  const fontFamily = isFa
-    ? "'Vazirmatn', 'IRANSans', 'Tahoma', sans-serif"
-    : "'Inter', 'Helvetica', sans-serif";
   const displayDate = isFa ? toJalaliTehran(data?.date) : data?.date || '';
   const buyer: LooseRecord = data?.buyer || {};
   const seller: LooseRecord = data?.seller || {};
@@ -209,7 +205,7 @@ export const buildProformaHtml = (raw: ProformaData, language: string) => {
     body {
       margin: 0;
       min-height: 100vh;
-      font-family: ${fontFamily};
+      font-family: 'Inter', 'Helvetica', sans-serif;
       background:
         radial-gradient(circle at top right, rgba(0, 90, 225, 0.13), transparent 34%),
         radial-gradient(circle at top left, rgba(255, 35, 50, 0.10), transparent 28%),
@@ -217,6 +213,7 @@ export const buildProformaHtml = (raw: ProformaData, language: string) => {
       color: var(--ink);
       line-height: 1.8;
     }
+    html[lang='fa'] body { font-family: 'Vazirmatn', 'IRANSans', 'Tahoma', sans-serif; }
     .page-shell { width: min(1180px, calc(100% - 40px)); margin: 32px auto; }
     .topbar { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-bottom: 20px; }
     .brand { display: flex; align-items: center; gap: 14px; }
@@ -313,10 +310,11 @@ export const buildProformaHtml = (raw: ProformaData, language: string) => {
     th, td {
       padding: 16px 18px;
       border-bottom: 1px solid var(--line);
-      text-align: ${textAlign};
+      text-align: left;
       vertical-align: middle;
       font-size: 14px;
     }
+    html[dir='rtl'] th, html[dir='rtl'] td { text-align: right; }
     th { color: var(--muted); background: #f9fafb; font-size: 12px; font-weight: 900; white-space: nowrap; }
     td { font-weight: 800; }
     .money { white-space: nowrap; font-variant-numeric: tabular-nums; }
