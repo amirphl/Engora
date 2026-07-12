@@ -11,10 +11,7 @@ const TermsPage: React.FC = () => {
           شرایط و ضوابط استفاده از سامانه
         </h1>
 
-        <div
-          className='space-y-6 text-gray-700 text-right'
-          style={{ textAlign: 'justify' }}
-        >
+        <div className='space-y-6 text-justify text-gray-700'>
           <section>
             <h2 className='font-semibold text-gray-900 mb-2'>
               ۱. تعاریف و اصطلاحات
