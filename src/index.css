@@ -214,3 +214,283 @@ body {
     margin-right: 0;
   }
 }
+
+/* CSP-safe component styles. Keep these in the external bundle rather than
+   creating runtime <style> elements or style attributes. */
+.landing-page {
+  --landing-bg-1: #0b1220;
+  --landing-bg-2: #070b14;
+  --landing-text: #e5e7eb;
+  --landing-blue: #0b67ff;
+  --landing-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  background:
+    radial-gradient(
+      1200px 700px at 80% 10%,
+      rgba(11, 103, 255, 0.22),
+      transparent 55%
+    ),
+    radial-gradient(
+      900px 520px at 15% 85%,
+      rgba(255, 43, 43, 0.16),
+      transparent 60%
+    ),
+    linear-gradient(180deg, var(--landing-bg-1), var(--landing-bg-2));
+  color: var(--landing-text);
+  font-family:
+    'Vazirmatn',
+    'Vazir',
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Tahoma,
+    Arial,
+    sans-serif;
+}
+
+.landing-layout {
+  width: min(980px, 100%);
+}
+.landing-panel {
+  background: linear-gradient(
+    180deg,
+    rgba(17, 28, 52, 0.92),
+    rgba(15, 23, 42, 0.92)
+  );
+  box-shadow: var(--landing-shadow);
+}
+.landing-intro {
+  padding: 28px 26px;
+}
+.landing-form {
+  padding: 22px;
+}
+.landing-decoration {
+  opacity: 0.9;
+  pointer-events: none;
+}
+.landing-decoration-intro-top {
+  inset: -120px -140px auto auto;
+  width: 420px;
+  height: 420px;
+  background:
+    radial-gradient(
+      circle at 30% 30%,
+      rgba(255, 43, 43, 0.26),
+      transparent 58%
+    ),
+    radial-gradient(
+      circle at 70% 70%,
+      rgba(11, 103, 255, 0.22),
+      transparent 60%
+    );
+  filter: blur(2px);
+  transform: rotate(18deg);
+}
+.landing-decoration-intro-bottom {
+  inset: auto auto -160px -160px;
+  width: 520px;
+  height: 520px;
+  background:
+    radial-gradient(
+      circle at 35% 35%,
+      rgba(11, 103, 255, 0.22),
+      transparent 60%
+    ),
+    radial-gradient(circle at 70% 70%, rgba(255, 43, 43, 0.16), transparent 62%);
+  transform: rotate(-10deg);
+  opacity: 0.8;
+}
+.landing-decoration-form {
+  inset: -120px auto auto -140px;
+  width: 360px;
+  height: 360px;
+  background:
+    radial-gradient(
+      circle at 30% 30%,
+      rgba(255, 43, 43, 0.22),
+      transparent 60%
+    ),
+    radial-gradient(circle at 70% 70%, rgba(11, 103, 255, 0.2), transparent 62%);
+  transform: rotate(12deg);
+}
+.landing-feature-grid {
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 14px;
+}
+.landing-feature-dot {
+  background: linear-gradient(
+    180deg,
+    var(--landing-blue),
+    rgba(11, 103, 255, 0.35)
+  );
+  box-shadow: 0 0 0 6px rgba(11, 103, 255, 0.1);
+}
+
+.bundle-score-progress {
+  appearance: none;
+  border: 0;
+}
+.bundle-score-progress::-webkit-progress-bar {
+  background: #f3f4f6;
+  border-radius: 9999px;
+}
+.bundle-score-progress::-webkit-progress-value {
+  background: #2563eb;
+  border-radius: 9999px;
+}
+.bundle-score-progress::-moz-progress-bar {
+  background: #2563eb;
+  border-radius: 9999px;
+}
+
+.calc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+}
+.calc-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.calc-chip,
+.calc-chip-amt {
+  cursor: pointer;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  color: #64748b;
+}
+.calc-chip.active,
+.calc-chip:hover,
+.calc-chip-amt.active,
+.calc-chip-amt:hover {
+  color: #1e293b;
+  border-color: #2563eb;
+  background: #eef2ff;
+}
+.calc-divider {
+  height: 1px;
+  background: #e2e8f0;
+  margin: 18px 0;
+}
+.calc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.calc-table th,
+.calc-table td {
+  padding: 12px 10px;
+  border-bottom: 1px solid #e2e8f0;
+  text-align: left;
+}
+[dir='rtl'] .calc-table th,
+[dir='rtl'] .calc-table td {
+  text-align: right;
+}
+.calc-table th {
+  color: #64748b;
+  font-weight: 700;
+  background: #f1f5ff;
+}
+.calc-val {
+  font-variant-numeric: tabular-nums;
+}
+.calc-good {
+  color: #16a34a;
+}
+.calc-warn {
+  color: #f97316;
+}
+.calc-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin-top: 12px;
+  color: #64748b;
+  font-size: 12px;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.calc-btn {
+  cursor: pointer;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #0f172a;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+.calc-btn:hover {
+  border-color: #2563eb;
+  background: #f1f5ff;
+}
+.calc-hint {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid #2563eb;
+  color: #2563eb;
+  font-size: 12px;
+  cursor: help;
+  margin-right: 6px;
+  position: relative;
+}
+[dir='rtl'] .calc-hint {
+  margin-right: 0;
+  margin-left: 6px;
+}
+.calc-hint::after {
+  content: attr(data-tip);
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #0b1d4d;
+  color: #fff;
+  padding: 8px 10px;
+  border-radius: 8px;
+  white-space: normal;
+  min-width: 220px;
+  max-width: 360px;
+  opacity: 0;
+  pointer-events: none;
+  transition: 0.15s;
+  box-shadow: 0 6px 20px rgba(2, 6, 23, 0.25);
+}
+[dir='rtl'] .calc-hint::after {
+  right: auto;
+  left: 100%;
+}
+.calc-hint:hover::after {
+  right: calc(100% + 8px);
+  opacity: 1;
+}
+[dir='rtl'] .calc-hint:hover::after {
+  right: auto;
+  left: calc(100% + 8px);
+}
+.calc-row-sep td {
+  border-top: 2px solid #2563eb !important;
+  background: #f8fbff;
+}
+.calc-rule td {
+  background: #eef2ff;
+  border-top: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
+}
+.calc-rule-check {
+  color: #16a34a;
+  margin-inline-start: 8px;
+}
