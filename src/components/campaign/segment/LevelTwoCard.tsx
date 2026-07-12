@@ -146,16 +146,11 @@ const LevelTwoCard: React.FC<LevelTwoCardProps> = ({
                               </span>
                               <span
                                 className={`text-gray-100 ${
-                                  isJustifiedMetaField(k) ? '' : 'text-left'
-                                }`}
-                                style={
                                   isJustifiedMetaField(k)
-                                    ? {
-                                        textAlign: 'justify',
-                                        direction: isRTL ? 'rtl' : 'ltr',
-                                      }
-                                    : undefined
-                                }
+                                    ? 'text-justify'
+                                    : 'text-left'
+                                }`}
+                                dir={isRTL ? 'rtl' : 'ltr'}
                               >
                                 {typeof v === 'object'
                                   ? JSON.stringify(v)
