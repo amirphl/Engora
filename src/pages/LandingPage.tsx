@@ -1,26 +1,6 @@
 import React, { useState } from 'react';
 import { useToast } from '../hooks/useToast';
 
-const gradientStyles = `
-  :root{
-    --bg1:#0b1220;
-    --bg2:#070b14;
-    --card:#0f172a;
-    --card2:#111c34;
-    --text:#e5e7eb;
-    --muted:#9ca3af;
-    --blue:#0b67ff;
-    --red:#ff2b2b;
-    --ring: rgba(11,103,255,.35);
-    --shadow: 0 24px 60px rgba(0,0,0,.55);
-    --radius: 18px;
-  }
-  *{box-sizing:border-box;}
-  body, #root {
-    background: transparent;
-  }
-`;
-
 const LandingPage: React.FC = () => {
   const { showSuccess, showError } = useToast();
 
@@ -75,60 +55,15 @@ const LandingPage: React.FC = () => {
   };
 
   return (
-    <div
-      dir='rtl'
-      className='min-h-screen'
-      style={{
-        background:
-          'radial-gradient(1200px 700px at 80% 10%, rgba(11,103,255,.22), transparent 55%), radial-gradient(900px 520px at 15% 85%, rgba(255,43,43,.16), transparent 60%), linear-gradient(180deg, var(--bg1), var(--bg2))',
-        color: 'var(--text)',
-        fontFamily:
-          '"Vazirmatn", "Vazir", system-ui, -apple-system, "Segoe UI", Tahoma, Arial',
-      }}
-    >
-      <style>{gradientStyles}</style>
+    <div dir='rtl' className='landing-page min-h-screen'>
       <div className='min-h-screen flex items-center justify-center px-4 py-7'>
-        <main
-          className='grid gap-5 w-full grid-cols-1 md:[grid-template-columns:1.15fr_.85fr]'
-          style={{ width: 'min(980px, 100%)' }}
-        >
+        <main className='landing-layout grid gap-5 w-full grid-cols-1 md:[grid-template-columns:1.15fr_.85fr]'>
           <section
-            className='relative rounded-[18px] border border-white/5 shadow-2xl overflow-hidden'
-            style={{
-              padding: '28px 26px',
-              background:
-                'linear-gradient(180deg, rgba(17,28,52,.92), rgba(15,23,42,.92))',
-              boxShadow: 'var(--shadow)',
-            }}
+            className='landing-panel landing-intro relative rounded-[18px] border border-white/5 shadow-2xl overflow-hidden'
             aria-label='معرفی جاذبه'
           >
-            <div
-              className='absolute'
-              style={{
-                inset: '-120px -140px auto auto',
-                width: 420,
-                height: 420,
-                background:
-                  'radial-gradient(circle at 30% 30%, rgba(255,43,43,.26), transparent 58%), radial-gradient(circle at 70% 70%, rgba(11,103,255,.22), transparent 60%)',
-                filter: 'blur(2px)',
-                transform: 'rotate(18deg)',
-                opacity: 0.9,
-                pointerEvents: 'none',
-              }}
-            />
-            <div
-              className='absolute'
-              style={{
-                inset: 'auto auto -160px -160px',
-                width: 520,
-                height: 520,
-                background:
-                  'radial-gradient(circle at 35% 35%, rgba(11,103,255,.22), transparent 60%), radial-gradient(circle at 70% 70%, rgba(255,43,43,.16), transparent 62%)',
-                transform: 'rotate(-10deg)',
-                opacity: 0.8,
-                pointerEvents: 'none',
-              }}
-            />
+            <div className='landing-decoration landing-decoration-intro-top absolute' />
+            <div className='landing-decoration landing-decoration-intro-bottom absolute' />
 
             <div className='relative flex items-center justify-between gap-3 mb-4'>
               <div className='flex items-center gap-3'>
@@ -170,10 +105,7 @@ const LandingPage: React.FC = () => {
                 سریع‌تر و کمپین‌های پربازده‌تر.
               </p>
 
-              <div
-                className='grid'
-                style={{ gridTemplateColumns: '1fr 1fr', gap: '10px 14px' }}
-              >
+              <div className='landing-feature-grid grid'>
                 {[
                   'ارسال هدفمند بر اساس سگمنت‌ها و سناریوهای واقعی.',
                   'رهگیری کلیک و تبدیل با لینک‌های کوتاه اختصاصی.',
@@ -184,14 +116,7 @@ const LandingPage: React.FC = () => {
                     key={text}
                     className='flex gap-3 items-start px-3 py-2.5 rounded-[14px] bg-white/5 border border-white/10 backdrop-blur-md'
                   >
-                    <span
-                      className='mt-1 w-2.5 h-2.5 rounded-full'
-                      style={{
-                        background:
-                          'linear-gradient(180deg, var(--blue), rgba(11,103,255,.35))',
-                        boxShadow: '0 0 0 6px rgba(11,103,255,.10)',
-                      }}
-                    />
+                    <span className='landing-feature-dot mt-1 w-2.5 h-2.5 rounded-full' />
                     <p className='m-0 text-[13px] text-slate-100/90 leading-6'>
                       {text}
                     </p>
@@ -202,28 +127,10 @@ const LandingPage: React.FC = () => {
           </section>
 
           <aside
-            className='relative rounded-[18px] border border-white/5 shadow-2xl overflow-hidden flex flex-col gap-3'
-            style={{
-              padding: '22px',
-              background:
-                'linear-gradient(180deg, rgba(17,28,52,.92), rgba(15,23,42,.92))',
-              boxShadow: 'var(--shadow)',
-            }}
+            className='landing-panel landing-form relative rounded-[18px] border border-white/5 shadow-2xl overflow-hidden flex flex-col gap-3'
             aria-label='ثبت شماره تماس'
           >
-            <div
-              className='absolute'
-              style={{
-                inset: '-120px auto auto -140px',
-                width: 360,
-                height: 360,
-                background:
-                  'radial-gradient(circle at 30% 30%, rgba(255,43,43,.22), transparent 60%), radial-gradient(circle at 70% 70%, rgba(11,103,255,.20), transparent 62%)',
-                transform: 'rotate(12deg)',
-                opacity: 0.9,
-                pointerEvents: 'none',
-              }}
-            />
+            <div className='landing-decoration landing-decoration-form absolute' />
             <h2 className='relative z-10 m-0 text-[20px]'>
               برای دریافت دمو، شماره خود را وارد کنید
             </h2>
