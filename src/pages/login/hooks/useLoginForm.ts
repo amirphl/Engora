@@ -3,22 +3,22 @@ import { useForm } from 'react-hook-form';
 import { useMutation } from '@tanstack/react-query';
 import { useAuth } from '../../../hooks/useAuth';
 import { useToast } from '../../../hooks/useToast';
-import {
-  login,
-  requestLoginOtp,
-  verifyLoginOtp,
-} from '../../../services/auth/api';
+import { login, requestLoginOtp } from '../../../services/auth/api';
 import {
   OTP_CODE_LENGTH,
   OTP_RESEND_SECONDS,
 } from '../../../services/auth/constants';
 import {
+  AuthCustomerDTO,
+  CustomerSessionDTO,
+  LoginResponse,
+} from '../../../services/auth/types';
+import {
   isValidOtpIdentifier,
   normalizeIdentifierInput,
-  parsePositiveInteger,
   sanitizeOtpIdentifierInput,
 } from '../../../services/auth/utils';
-import { LoginFormValues, LoginMethod } from '../types';
+import { LoginFormValues, LoginStep } from '../types';
 import { loginTranslations } from '../translations';
 import { getLoginErrorMessage } from '../utils';
 
@@ -29,81 +29,88 @@ interface UseLoginFormOptions {
   strings: LoginStrings;
 }
 
+interface ParsedLoginResponse {
+  customer: AuthCustomerDTO;
+  session: CustomerSessionDTO;
+}
+
+const parseLoginResponse = (value: unknown): ParsedLoginResponse | null => {
+  if (!value || typeof value !== 'object') return null;
+
+  const candidate = value as Partial<LoginResponse> & {
+    customer?: AuthCustomerDTO;
+    session?: CustomerSessionDTO;
+  };
+  const customer = candidate.Customer ?? candidate.customer;
+  const session = candidate.Session ?? candidate.session;
+
+  if (
+    !customer ||
+    typeof customer.id !== 'number' ||
+    typeof customer.uuid !== 'string' ||
+    typeof customer.account_type !== 'string' ||
+    !session ||
+    typeof session.access_token !== 'string' ||
+    !session.access_token ||
+    typeof session.refresh_token !== 'string' ||
+    !session.refresh_token
+  ) {
+    return null;
+  }
+
+  return { customer, session };
+};
+
 export const useLoginForm = ({ language, strings }: UseLoginFormOptions) => {
-  const { login: handleLogin } = useAuth();
+  const { login: saveSession } = useAuth();
   const { showSuccess, showError } = useToast();
-  const [loginMethod, setLoginMethod] = useState<LoginMethod>(() => {
-    if (typeof window === 'undefined') return 'password';
-    const method = new URLSearchParams(window.location.search).get('method');
-    return method === 'otp' ? 'otp' : 'password';
-  });
+  const [step, setStep] = useState<LoginStep>('request-otp');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [showOtpModal, setShowOtpModal] = useState(false);
-  const [otpCode, setOtpCode] = useState('');
-  const [otpCustomerId, setOtpCustomerId] = useState<number | null>(null);
+  const [otpRequestedFor, setOtpRequestedFor] = useState<string | null>(null);
   const [canResendOtp, setCanResendOtp] = useState(false);
   const [resendCountdown, setResendCountdown] = useState(OTP_RESEND_SECONDS);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const requestInFlightRef = useRef(false);
+  const loginInFlightRef = useRef(false);
 
   const form = useForm<LoginFormValues>({
     defaultValues: {
       identifier: '',
       password: '',
+      otpCode: '',
     },
   });
 
-  const resetCountdown = useCallback(() => {
+  const stopCountdown = useCallback(() => {
     if (countdownRef.current) {
       clearInterval(countdownRef.current);
       countdownRef.current = null;
     }
   }, []);
 
-  useEffect(() => () => resetCountdown(), [resetCountdown]);
-
-  useEffect(() => {
-    setErrorMessage('');
-    form.clearErrors();
-    form.setValue(
-      'identifier',
-      sanitizeOtpIdentifierInput(form.getValues('identifier')),
-      {
-        shouldDirty: false,
-        shouldValidate: false,
-      }
-    );
-    if (loginMethod === 'otp') {
-      form.setValue('password', '');
-    } else {
-      setOtpCode('');
-      setShowOtpModal(false);
-      setOtpCustomerId(null);
-      resetCountdown();
-      setCanResendOtp(false);
-      setResendCountdown(OTP_RESEND_SECONDS);
-    }
-  }, [form, loginMethod, resetCountdown]);
+  useEffect(() => () => stopCountdown(), [stopCountdown]);
 
   const startResendCountdown = useCallback(() => {
-    resetCountdown();
+    stopCountdown();
     setCanResendOtp(false);
     setResendCountdown(OTP_RESEND_SECONDS);
+
     countdownRef.current = setInterval(() => {
-      setResendCountdown(prev => {
-        if (prev <= 1) {
+      setResendCountdown(previous => {
+        if (previous <= 1) {
+          stopCountdown();
           setCanResendOtp(true);
-          resetCountdown();
           return 0;
         }
-        return prev - 1;
+        return previous - 1;
       });
     }, 1000);
-  }, [resetCountdown]);
+  }, [stopCountdown]);
 
   const loginMutation = useMutation({
     mutationFn: (values: LoginFormValues) =>
-      login(values.identifier, values.password),
+      login(values.identifier, values.password, values.otpCode),
     retry: false,
   });
 
@@ -112,38 +119,12 @@ export const useLoginForm = ({ language, strings }: UseLoginFormOptions) => {
     retry: false,
   });
 
-  const verifyOtpMutation = useMutation({
-    mutationFn: ({
-      customerId,
-      otpCode,
-    }: {
-      customerId: number;
-      otpCode: string;
-    }) => verifyLoginOtp(customerId, otpCode),
-    retry: false,
-  });
-
-  const applyLoginSuccess = useCallback(
-    (responseData: any) => {
-      if (
-        responseData?.customer &&
-        responseData?.access_token &&
-        responseData?.refresh_token
-      ) {
-        handleLogin(
-          {
-            token: responseData.access_token,
-            refresh_token: responseData.refresh_token,
-          },
-          responseData.customer
-        );
-        showSuccess(strings.success);
-        window.location.href = '/dashboard';
-        return true;
-      }
-      return false;
+  const showFormError = useCallback(
+    (message: string) => {
+      setErrorMessage(message);
+      showError(message);
     },
-    [handleLogin, showSuccess, strings.success]
+    [showError]
   );
 
   const resolveErrorMessage = useCallback(
@@ -158,199 +139,190 @@ export const useLoginForm = ({ language, strings }: UseLoginFormOptions) => {
     [language, strings]
   );
 
+  const sendOtp = useCallback(
+    async (identifier: string) => {
+      if (requestInFlightRef.current) return;
+      requestInFlightRef.current = true;
+      setErrorMessage('');
+
+      try {
+        const response = await requestOtpMutation.mutateAsync(identifier);
+        if (!response.success) {
+          showFormError(
+            resolveErrorMessage(response, strings.error.otpSendFailed)
+          );
+          return;
+        }
+
+        setOtpRequestedFor(identifier);
+        setStep('authenticate');
+        startResendCountdown();
+        showSuccess(strings.otpSentSuccess);
+      } catch {
+        showFormError(strings.error.unexpected);
+      } finally {
+        requestInFlightRef.current = false;
+      }
+    },
+    [
+      requestOtpMutation,
+      resolveErrorMessage,
+      showFormError,
+      showSuccess,
+      startResendCountdown,
+      strings,
+    ]
+  );
+
   const handleSubmit = form.handleSubmit(async values => {
-    if (loginMutation.isPending || requestOtpMutation.isPending) {
+    const identifier = normalizeIdentifierInput(values.identifier);
+
+    if (step === 'request-otp') {
+      await sendOtp(identifier);
       return;
     }
 
+    if (!otpRequestedFor || identifier !== otpRequestedFor) {
+      showFormError(strings.error.otpNotRequested);
+      return;
+    }
+
+    if (loginInFlightRef.current) return;
+    loginInFlightRef.current = true;
     setErrorMessage('');
 
-    if (loginMethod === 'password') {
+    try {
       const response = await loginMutation.mutateAsync({
-        ...values,
-        identifier: normalizeIdentifierInput(values.identifier),
+        identifier,
+        password: values.password,
+        otpCode: values.otpCode,
       });
-      if (response.success && response.data) {
-        const responseData = response.data.data || response.data;
-        const applied = applyLoginSuccess(responseData);
-        if (!applied) {
-          const errorText = strings.error.invalidResponse;
-          setErrorMessage(errorText);
-          showError(errorText);
-        }
-      } else {
-        const errorText = resolveErrorMessage(
-          response,
-          strings.error.invalidCredentials
-        );
-        setErrorMessage(errorText);
-        showError(errorText);
-      }
-      return;
-    }
 
-    const identifierValue = normalizeIdentifierInput(values.identifier || '');
-    if (!identifierValue) {
-      setErrorMessage(strings.validation.allFieldsRequired);
-      showError(strings.validation.allFieldsRequired);
-      return;
-    }
-
-    const response = await requestOtpMutation.mutateAsync(identifierValue);
-    if (response.success) {
-      const responseData = response.data?.data || response.data;
-      const customerId = parsePositiveInteger(
-        responseData?.customer_id ?? responseData?.customerId
-      );
-      if (!customerId) {
-        const errorText = resolveErrorMessage(
-          { success: false, error: { code: 'INVALID_CUSTOMER_ID' } },
-          strings.error.otpSendFailed
+      if (!response.success) {
+        showFormError(
+          resolveErrorMessage(response, strings.error.invalidCredentials)
         );
-        setErrorMessage(errorText);
-        showError(errorText);
         return;
       }
-      setOtpCustomerId(customerId);
-      setShowOtpModal(true);
-      startResendCountdown();
-      showSuccess(response.message || strings.otpSent);
-    } else {
-      const errorText = resolveErrorMessage(
-        response,
-        strings.error.otpSendFailed
+
+      const loginResponse = parseLoginResponse(response.data);
+      if (!loginResponse) {
+        showFormError(strings.error.invalidResponse);
+        return;
+      }
+
+      saveSession(
+        {
+          token: loginResponse.session.access_token,
+          refresh_token: loginResponse.session.refresh_token,
+        },
+        loginResponse.customer
       );
-      setErrorMessage(errorText);
-      showError(errorText);
+      stopCountdown();
+      showSuccess(strings.success);
+      window.location.assign('/dashboard');
+    } catch {
+      showFormError(strings.error.unexpected);
+    } finally {
+      loginInFlightRef.current = false;
     }
   });
 
-  const handleVerifyOtp = useCallback(async () => {
-    if (verifyOtpMutation.isPending) {
-      return;
-    }
-
-    if (otpCode.length !== OTP_CODE_LENGTH) {
-      setErrorMessage(strings.validation.otpRequired);
-      showError(strings.validation.otpRequired);
-      return;
-    }
-
-    if (!otpCustomerId) {
-      const errorText = strings.error.invalidCustomerId;
-      setErrorMessage(errorText);
-      showError(errorText);
-      return;
-    }
-
-    const response = await verifyOtpMutation.mutateAsync({
-      customerId: otpCustomerId,
-      otpCode,
-    });
-
-    if (response.success && response.data) {
-      const responseData = response.data.data || response.data;
-      const applied = applyLoginSuccess(responseData);
-      if (!applied) {
-        const errorText = strings.error.invalidResponse;
-        setErrorMessage(errorText);
-        showError(errorText);
-      } else {
-        setShowOtpModal(false);
-      }
-    } else {
-      const errorText = resolveErrorMessage(response, strings.error.invalidOtp);
-      setErrorMessage(errorText);
-      showError(errorText);
-    }
-  }, [
-    otpCode,
-    otpCustomerId,
-    verifyOtpMutation,
-    applyLoginSuccess,
-    showError,
-    resolveErrorMessage,
-    strings,
-  ]);
-
   const handleResendOtp = useCallback(async () => {
-    if (!canResendOtp || requestOtpMutation.isPending) return;
-
-    const identifierValue = normalizeIdentifierInput(
-      form.getValues('identifier')
-    );
-    const response = await requestOtpMutation.mutateAsync(identifierValue);
-    if (response.success) {
-      const responseData = response.data?.data || response.data;
-      const customerId = parsePositiveInteger(
-        responseData?.customer_id ?? responseData?.customerId
-      );
-      if (customerId) {
-        setOtpCustomerId(customerId);
-      }
-      startResendCountdown();
-      showSuccess(response.message || strings.otpSent);
-    } else {
-      const errorText = resolveErrorMessage(
-        response,
-        strings.error.otpSendFailed
-      );
-      setErrorMessage(errorText);
-      showError(errorText);
+    if (!canResendOtp || !otpRequestedFor || requestInFlightRef.current) {
+      return;
     }
-  }, [
-    canResendOtp,
-    form,
-    requestOtpMutation,
-    startResendCountdown,
-    showSuccess,
-    showError,
-    resolveErrorMessage,
-    strings,
-  ]);
+    await sendOtp(otpRequestedFor);
+  }, [canResendOtp, otpRequestedFor, sendOtp]);
 
-  const identifierRules = useMemo(() => {
-    return {
-      required: strings.validation.allFieldsRequired,
+  const handleChangeIdentifier = useCallback(() => {
+    stopCountdown();
+    setStep('request-otp');
+    setOtpRequestedFor(null);
+    setCanResendOtp(false);
+    setResendCountdown(OTP_RESEND_SECONDS);
+    setErrorMessage('');
+    form.clearErrors();
+    form.setValue('password', '');
+    form.setValue('otpCode', '');
+    form.setFocus('identifier');
+  }, [form, stopCountdown]);
+
+  const identifierRules = useMemo(
+    () => ({
+      required: strings.validation.identifierRequired,
       validate: (value: string) =>
         isValidOtpIdentifier(value) || strings.validation.invalidMobile,
-    };
-  }, [strings]);
+    }),
+    [strings]
+  );
+
+  const passwordRules = useMemo(
+    () => ({
+      required: strings.validation.passwordRequired,
+      minLength: {
+        value: 8,
+        message: strings.validation.passwordLength,
+      },
+      maxLength: {
+        value: 100,
+        message: strings.validation.passwordLength,
+      },
+    }),
+    [strings]
+  );
+
+  const otpRules = useMemo(
+    () => ({
+      required: strings.validation.otpRequired,
+      pattern: {
+        value: /^\d{6}$/,
+        message: strings.validation.otpRequired,
+      },
+    }),
+    [strings]
+  );
 
   const setIdentifierValue = useCallback(
     (value: string) => {
-      const nextValue = sanitizeOtpIdentifierInput(value);
-      form.setValue('identifier', nextValue, {
+      form.setValue('identifier', sanitizeOtpIdentifierInput(value), {
         shouldDirty: true,
-        shouldValidate: true,
+        shouldValidate: form.formState.isSubmitted,
       });
     },
     [form]
   );
 
-  const isSubmitting = loginMutation.isPending || requestOtpMutation.isPending;
-  const isOtpLoading =
-    verifyOtpMutation.isPending || requestOtpMutation.isPending;
+  const setOtpValue = useCallback(
+    (value: string) => {
+      form.setValue(
+        'otpCode',
+        value.replace(/\D/g, '').slice(0, OTP_CODE_LENGTH),
+        {
+          shouldDirty: true,
+          shouldValidate: form.formState.isSubmitted,
+        }
+      );
+    },
+    [form]
+  );
 
   return {
     form,
-    loginMethod,
-    setLoginMethod,
+    step,
     showPassword,
     setShowPassword,
     errorMessage,
     handleSubmit,
     identifierRules,
+    passwordRules,
+    otpRules,
     setIdentifierValue,
-    showOtpModal,
-    setShowOtpModal,
-    otpCode,
-    setOtpCode,
-    handleVerifyOtp,
+    setOtpValue,
+    handleChangeIdentifier,
+    handleResendOtp,
     canResendOtp,
     resendCountdown,
-    handleResendOtp,
-    isSubmitting,
-    isOtpLoading,
+    isSubmitting: loginMutation.isPending || requestOtpMutation.isPending,
   };
 };
