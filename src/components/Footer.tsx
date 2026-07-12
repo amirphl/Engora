@@ -51,9 +51,6 @@ const Footer: React.FC = () => {
   };
 
   const phoneHref = getPrimaryPhoneHref(contactT.phone || '');
-  const enamadHtml =
-    "<a referrerpolicy='origin' target='_blank' href='https://trustseal.enamad.ir/?id=661883&Code=FIH4Yi6KwGkuPSeweo3M7XGoegrAOrTP'><img referrerpolicy='origin' src='https://trustseal.enamad.ir/logo.aspx?id=661883&Code=FIH4Yi6KwGkuPSeweo3M7XGoegrAOrTP' alt='' style='cursor:pointer' code='FIH4Yi6KwGkuPSeweo3M7XGoegrAOrTP'></a>";
-
   return (
     <footer className='bg-gray-900 text-white'>
       <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12'>
@@ -173,7 +170,20 @@ const Footer: React.FC = () => {
             isRTL ? 'sm:flex-row-reverse' : 'sm:flex-row'
           } sm:justify-between`}
         >
-          <div dangerouslySetInnerHTML={{ __html: enamadHtml }} />
+          <a
+            href='https://trustseal.enamad.ir/?id=661883&Code=FIH4Yi6KwGkuPSeweo3M7XGoegrAOrTP'
+            target='_blank'
+            rel='noreferrer'
+            referrerPolicy='origin'
+            aria-label='Verify eNamad trust seal'
+          >
+            <img
+              className='cursor-pointer'
+              referrerPolicy='origin'
+              src='https://trustseal.enamad.ir/logo.aspx?id=661883&Code=FIH4Yi6KwGkuPSeweo3M7XGoegrAOrTP'
+              alt='eNamad trust seal'
+            />
+          </a>
           <p className='text-gray-400'>{footerT.copyright}</p>
         </div>
       </div>
