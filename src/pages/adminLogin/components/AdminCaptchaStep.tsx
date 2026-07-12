@@ -119,12 +119,20 @@ export const AdminCaptchaStep: React.FC<AdminCaptchaStepProps> = ({
 
           <div className='flex items-center gap-3 w-full justify-center'>
             {thumbSrc ? (
-              <img
-                src={thumbSrc}
-                alt={strings.fields.captchaThumbAlt}
+              <svg
+                viewBox='0 0 64 64'
+                role='img'
+                aria-label={strings.fields.captchaThumbAlt}
                 className='w-16 h-16 rounded-full border border-gray-200'
-                style={{ transform: `rotate(${angle}deg)` }}
-              />
+              >
+                <image
+                  href={thumbSrc}
+                  width='64'
+                  height='64'
+                  preserveAspectRatio='xMidYMid slice'
+                  transform={`rotate(${angle} 32 32)`}
+                />
+              </svg>
             ) : (
               <div className='w-16 h-16 rounded-full bg-gray-100' />
             )}
