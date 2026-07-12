@@ -59,28 +59,6 @@ const AgencyCalculatorModal: React.FC<CalculatorProps> = ({
         className='relative bg-white rounded-2xl w-full max-w-5xl overflow-hidden shadow-2xl border border-gray-200'
         dir={dir}
       >
-        <style>{`
-          .calc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
-          .calc-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-          .calc-chip, .calc-chip-amt { cursor: pointer; background: #fff; border: 1px solid #e2e8f0; padding: 6px 10px; border-radius: 999px; font-size: 12px; color: #64748b; }
-          .calc-chip.active, .calc-chip:hover, .calc-chip-amt.active, .calc-chip-amt:hover { color: #1e293b; border-color: #2563eb; background: #eef2ff; }
-          .calc-divider { height: 1px; background: #e2e8f0; margin: 18px 0; }
-          .calc-table { width: 100%; border-collapse: collapse; font-size: 13px; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; }
-          .calc-table th, .calc-table td { padding: 12px 10px; border-bottom: 1px solid #e2e8f0; text-align: ${dir === 'rtl' ? 'right' : 'left'}; }
-          .calc-table th { color: #64748b; font-weight: 700; background: #f1f5ff; }
-          .calc-val { font-variant-numeric: tabular-nums; }
-          .calc-good { color: #16a34a; }
-          .calc-warn { color: #f97316; }
-          .calc-footer { display: flex; justify-content: flex-end; align-items: center; margin-top: 12px; color: #64748b; font-size: 12px; gap: 10px; flex-wrap: wrap; }
-          .calc-btn { cursor: pointer; border: 1px solid #e2e8f0; background: #fff; color: #0f172a; padding: 8px 12px; border-radius: 10px; font-size: 13px; }
-          .calc-btn:hover { border-color: #2563eb; background: #f1f5ff; }
-          .calc-hint { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; border: 1px solid #2563eb; color: #2563eb; font-size: 12px; cursor: help; margin-${dir === 'rtl' ? 'left' : 'right'}: 6px; position: relative; }
-          .calc-hint::after { content: attr(data-tip); position: absolute; ${dir === 'rtl' ? 'left' : 'right'}: 100%; top: 50%; transform: translateY(-50%); background: #0b1d4d; color: #fff; padding: 8px 10px; border-radius: 8px; white-space: normal; min-width: 220px; max-width: 360px; opacity: 0; pointer-events: none; transition: .15s; box-shadow: 0 6px 20px rgba(2,6,23,.25); }
-          .calc-hint:hover::after { opacity: 1; ${dir === 'rtl' ? 'left' : 'right'}: calc(100% + 8px); }
-          .calc-row-sep td { border-top: 2px solid #2563eb !important; background: #f8fbff; }
-          .calc-rule td { background: #eef2ff; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; }
-        `}</style>
-
         <div className='p-6 space-y-4'>
           <div className='flex items-center justify-between'>
             <h3 className='text-lg font-semibold text-gray-900'>
@@ -209,11 +187,7 @@ const AgencyCalculatorModal: React.FC<CalculatorProps> = ({
                       {dir === 'rtl' ? '۲' : '2'} ×{' '}
                       {formatNumber(calculations.reduction, dir)}
                     </span>{' '}
-                    <span
-                      style={{ color: '#16a34a', marginInlineStart: '8px' }}
-                    >
-                      ✔
-                    </span>
+                    <span className='calc-rule-check'>✔</span>
                   </td>
                 </tr>
                 <tr className='calc-row-sep'>
