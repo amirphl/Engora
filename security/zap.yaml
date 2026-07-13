@@ -1,0 +1,81 @@
+---
+env:
+  vars:
+    target: ${ZAP_TARGET}
+  contexts:
+    - name: jazebeh-frontend
+      urls:
+        - ${target}
+      includePaths:
+        - ${target}.*
+  parameters:
+    failOnError: true
+    failOnWarning: false
+    progressToStdout: true
+
+jobs:
+  - type: spider
+    parameters:
+      context: jazebeh-frontend
+      url: ${target}
+      maxDuration: 5
+
+  - type: spiderAjax
+    parameters:
+      context: jazebeh-frontend
+      url: ${target}
+      maxDuration: 5
+      maxCrawlDepth: 10
+      numberOfBrowsers: 1
+      browserId: firefox-headless
+
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 10
+
+  - type: activeScan
+    parameters:
+      context: jazebeh-frontend
+      url: ${target}
+      maxRuleDurationInMins: 5
+      maxScanDurationInMins: 60
+
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 10
+
+  - type: report
+    parameters:
+      template: modern
+      reportDir: /zap/wrk/security-reports
+      reportFile: zap-modern.html
+      reportTitle: Jazebeh frontend security scan
+      reportDescription: OWASP ZAP full active and passive scan
+      displayReport: false
+    risks:
+      - high
+      - medium
+      - low
+      - info
+    confidences:
+      - high
+      - medium
+      - low
+
+  - type: report
+    parameters:
+      template: traditional-json-plus
+      reportDir: /zap/wrk/security-reports
+      reportFile: zap-report.json
+      reportTitle: Jazebeh frontend security scan
+      reportDescription: Machine-readable OWASP ZAP results
+      displayReport: false
+    risks:
+      - high
+      - medium
+      - low
+      - info
+    confidences:
+      - high
+      - medium
+      - low
