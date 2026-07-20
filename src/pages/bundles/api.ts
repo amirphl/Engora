@@ -3,8 +3,12 @@ import {
   CreateBundleRequest,
   CreateBundleResponse,
   GetBundlePayload,
+  GetBundleTagEvaluationStatusResponse,
+  ListBundleTagScoresParams,
+  ListBundleTagScoresResponse,
   ListBundlesParams,
   ListBundlesResponse,
+  RequestBundleTagEvaluationResponse,
   UpdateBundleRequest,
   UpdateBundleResponse,
 } from '../../types/bundle';
@@ -23,6 +27,22 @@ export const bundlesApi = {
   update: (id: number, payload: UpdateBundleRequest) =>
     apiService.updateBundle(id, payload) as Promise<
       ApiResponse<UpdateBundleResponse>
+    >,
+  requestTagEvaluation: (id: number) =>
+    apiService.requestBundleTagEvaluation(id) as Promise<
+      ApiResponse<RequestBundleTagEvaluationResponse>
+    >,
+  getTagEvaluationStatus: (id: number, signal?: AbortSignal) =>
+    apiService.getBundleTagEvaluationStatus(id, signal) as Promise<
+      ApiResponse<GetBundleTagEvaluationStatusResponse>
+    >,
+  listTagScores: (
+    id: number,
+    params: ListBundleTagScoresParams,
+    signal?: AbortSignal
+  ) =>
+    apiService.listBundleTagScores(id, params, signal) as Promise<
+      ApiResponse<ListBundleTagScoresResponse>
     >,
 };
 

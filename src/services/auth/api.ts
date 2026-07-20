@@ -1,6 +1,6 @@
 import { getApiUrl, isProduction } from '../../config/environment';
-import { AUTH_ENDPOINTS, OTP_CODE_LENGTH } from './constants';
-import { AuthApiResponse } from './types';
+import { AUTH_ENDPOINTS } from './constants';
+import { AuthApiResponse, LoginResponse } from './types';
 import { isPhoneLikeIdentifier, normalizeIdentifierInput } from './utils';
 
 const AUTH_ERROR_CODES = {
@@ -8,7 +8,6 @@ const AUTH_ERROR_CODES = {
   invalidIdentifier: 'INVALID_IDENTIFIER',
   invalidPassword: 'INVALID_PASSWORD',
   invalidMobileNumber: 'INVALID_MOBILE_NUMBER',
-  invalidCustomerId: 'INVALID_CUSTOMER_ID',
   invalidOtpCode: 'INVALID_OTP_CODE',
   invalidResponseContentType: 'INVALID_RESPONSE_CONTENT_TYPE',
   networkError: 'NETWORK_ERROR',
@@ -60,21 +59,17 @@ const createTimeoutSignal = (
   timeoutMs: number,
   signal?: AbortSignal | null
 ): AbortSignal => {
-  if (!signal) {
-    return AbortSignal.timeout(timeoutMs);
-  }
-
   const controller = new AbortController();
   const timeoutId = globalThis.setTimeout(() => controller.abort(), timeoutMs);
   const clearTimer = () => globalThis.clearTimeout(timeoutId);
 
-  if (signal.aborted) {
+  if (signal?.aborted) {
     clearTimer();
     controller.abort(signal.reason);
     return controller.signal;
   }
 
-  signal.addEventListener(
+  signal?.addEventListener(
     'abort',
     () => {
       clearTimer();
@@ -102,17 +97,14 @@ const parseJsonResponse = async (response: Response): Promise<any | null> => {
 };
 
 const formatPhoneNumber = (phoneNumber: string): string => {
-  let cleaned = phoneNumber.replace(/^\+98/, '').replace(/^0+/, '');
+  const normalized = normalizeIdentifierInput(phoneNumber);
+  const nationalNumber = normalized
+    .replace(/^\+98/, '')
+    .replace(/^0098/, '')
+    .replace(/^98/, '')
+    .replace(/^0/, '');
 
-  if (cleaned.startsWith('9')) {
-    return `+98${cleaned}`;
-  }
-
-  if (cleaned.startsWith('98')) {
-    return `+${cleaned}`;
-  }
-
-  return `+98${cleaned}`;
+  return `+98${nationalNumber}`;
 };
 
 const isValidUrl = (url: string): boolean => {
@@ -124,6 +116,31 @@ const isValidUrl = (url: string): boolean => {
     return true;
   } catch {
     return false;
+  }
+};
+
+const getHttpErrorCode = (status: number): string => {
+  switch (status) {
+    case 400:
+      return 'INVALID_REQUEST';
+    case 401:
+      return 'INVALID_CREDENTIALS';
+    case 403:
+      return 'FORBIDDEN';
+    case 404:
+      return 'CUSTOMER_NOT_FOUND';
+    case 408:
+      return AUTH_ERROR_CODES.timeoutError;
+    case 429:
+      return 'RATE_LIMIT_EXCEEDED';
+    case 500:
+      return 'INTERNAL_SERVER_ERROR';
+    case 502:
+    case 503:
+    case 504:
+      return 'SERVICE_UNAVAILABLE';
+    default:
+      return 'UNKNOWN_ERROR';
   }
 };
 
@@ -171,18 +188,20 @@ const authRequest = async <T>(
     }
 
     if (!response.ok) {
-      let errorMessage = `HTTP ${response.status}`;
-      if (data.error && data.error.code) {
-        errorMessage = data.error.code;
-      } else if (data.message) {
-        errorMessage = data.message;
-      }
+      const errorCode =
+        typeof data.error?.code === 'string' && data.error.code.trim()
+          ? data.error.code.trim()
+          : getHttpErrorCode(response.status);
+      const errorMessage =
+        typeof data.message === 'string' && data.message.trim()
+          ? data.message.trim()
+          : errorCode;
 
       return {
         success: false,
         message: errorMessage,
         error: {
-          code: errorMessage,
+          code: errorCode,
           details: data.error?.details,
         },
       };
@@ -194,7 +213,10 @@ const authRequest = async <T>(
       data: data.data,
     };
   } catch (error) {
-    if (error instanceof DOMException && error.name === 'AbortError') {
+    if (
+      error instanceof DOMException &&
+      (error.name === 'AbortError' || error.name === 'TimeoutError')
+    ) {
       return createAuthErrorResponse(AUTH_ERROR_CODES.timeoutError);
     }
 
@@ -218,8 +240,9 @@ const authRequest = async <T>(
 
 export const login = async (
   identifier: string,
-  password: string
-): Promise<AuthApiResponse> => {
+  password: string,
+  otpCode: string
+): Promise<AuthApiResponse<LoginResponse>> => {
   if (
     !identifier ||
     typeof identifier !== 'string' ||
@@ -228,8 +251,17 @@ export const login = async (
     return createAuthErrorResponse(AUTH_ERROR_CODES.invalidIdentifier);
   }
 
-  if (!password || typeof password !== 'string' || password.length < 8) {
+  if (
+    !password ||
+    typeof password !== 'string' ||
+    password.length < 8 ||
+    password.length > 100
+  ) {
     return createAuthErrorResponse(AUTH_ERROR_CODES.invalidPassword);
+  }
+
+  if (typeof otpCode !== 'string' || !/^\d{6}$/.test(otpCode)) {
+    return createAuthErrorResponse(AUTH_ERROR_CODES.invalidOtpCode);
   }
 
   let formattedIdentifier = normalizeIdentifierInput(identifier);
@@ -248,6 +280,7 @@ export const login = async (
     body: JSON.stringify({
       identifier: formattedIdentifier,
       password,
+      otp_code: otpCode,
     }),
   });
 };
@@ -281,30 +314,5 @@ export const requestLoginOtp = async (
   return authRequest(AUTH_ENDPOINTS.loginOtp, {
     method: 'POST',
     body: JSON.stringify(payload),
-  });
-};
-
-export const verifyLoginOtp = async (
-  customerId: number,
-  otpCode: string
-): Promise<AuthApiResponse> => {
-  if (!customerId || typeof customerId !== 'number' || customerId <= 0) {
-    return createAuthErrorResponse(AUTH_ERROR_CODES.invalidCustomerId);
-  }
-
-  if (
-    !otpCode ||
-    typeof otpCode !== 'string' ||
-    otpCode.length !== OTP_CODE_LENGTH
-  ) {
-    return createAuthErrorResponse(AUTH_ERROR_CODES.invalidOtpCode);
-  }
-
-  return authRequest(AUTH_ENDPOINTS.loginOtpVerify, {
-    method: 'POST',
-    body: JSON.stringify({
-      customer_id: customerId,
-      otp_code: otpCode,
-    }),
   });
 };

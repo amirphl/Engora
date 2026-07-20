@@ -1,16 +1,13 @@
 # Multi-stage Dockerfile for React Application
-# Supports: jaazebeh.ir and beta.jaazebeh.ir
+# Supports: jazebeh.ir and beta.jazebeh.ir
 
 # Stage 1: Build stage
-FROM node:24-alpine AS builder
+FROM node:24-bookworm-slim AS builder
 
 # Build arguments
 ARG NPM_REGISTRY=https://registry.npmjs.org/
 ARG NODE_ENV=production
 ARG PRODUCTION_DOMAIN=jazebeh.ir
-
-# Install build dependencies
-RUN apk add --no-cache python3 make g++
 
 # Set working directory
 WORKDIR /app
@@ -24,7 +21,7 @@ RUN npm config set registry ${NPM_REGISTRY} && \
     npm config set fetch-retry-mintimeout 5000 && \
     npm config set fetch-retry-maxtimeout 60000 && \
     npm config set fetch-retry-factor 2 && \
-    npm ci --silent --no-audit --no-fund
+    npm ci --no-audit --no-fund
 
 # Copy source code
 COPY . .
@@ -49,13 +46,14 @@ ENV NODE_ENV=production \
 # Build the application for production
 RUN npm run build:production
 
-# Stage 2: Production stage
-FROM nginx:1.29-alpine AS production
+# Stage 2: Production stage. Alpine's nginx and headers-more packages are built
+# together, which lets us remove the otherwise unavoidable `Server: nginx`
+# response header without using a binary-incompatible third-party module.
+FROM alpine:3.22 AS production
 
 # Install security updates and necessary packages
-RUN apk update && \
-    apk upgrade --no-cache && \
-    apk add --no-cache ca-certificates tzdata curl && \
+RUN apk upgrade --no-cache && \
+    apk add --no-cache ca-certificates tzdata curl nginx nginx-mod-http-headers-more && \
     rm -rf /var/cache/apk/*
 
 # Copy built application from builder stage

@@ -45,6 +45,11 @@ const PasswordField: React.FC<PasswordFieldProps> = ({
         placeholder={placeholder}
         dir='ltr'
         required
+        minLength={8}
+        maxLength={100}
+        autoComplete='current-password'
+        aria-invalid={Boolean(error)}
+        aria-describedby={error ? 'password-error' : undefined}
       />
       <button
         type='button'
@@ -58,7 +63,11 @@ const PasswordField: React.FC<PasswordFieldProps> = ({
         )}
       </button>
     </div>
-    {error && <p className='mt-2 text-sm text-red-600'>{error}</p>}
+    {error && (
+      <p id='password-error' className='mt-2 text-sm text-red-600'>
+        {error}
+      </p>
+    )}
   </div>
 );
 

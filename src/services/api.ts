@@ -23,8 +23,12 @@ import {
   CreateBundleRequest,
   CreateBundleResponse,
   GetBundlePayload,
+  GetBundleTagEvaluationStatusResponse,
+  ListBundleTagScoresParams,
+  ListBundleTagScoresResponse,
   ListBundlesParams,
   ListBundlesResponse,
+  RequestBundleTagEvaluationResponse,
   UpdateBundleRequest,
   UpdateBundleResponse,
 } from '../types/bundle';
@@ -67,7 +71,6 @@ import {
 import {
   login as authLogin,
   requestLoginOtp as authRequestLoginOtp,
-  verifyLoginOtp as authVerifyLoginOtp,
 } from './auth/api';
 
 // Updated to match Go backend response structure
@@ -556,19 +559,16 @@ class ApiService {
   }
 
   // Auth endpoints
-  async login(identifier: string, password: string): Promise<ApiResponse> {
-    return authLogin(identifier, password);
+  async login(
+    identifier: string,
+    password: string,
+    otpCode: string
+  ): Promise<ApiResponse> {
+    return authLogin(identifier, password, otpCode);
   }
 
   async requestLoginOtp(identifier: string): Promise<ApiResponse> {
     return authRequestLoginOtp(identifier);
-  }
-
-  async verifyLoginOtp(
-    customerId: number,
-    otpCode: string
-  ): Promise<ApiResponse> {
-    return authVerifyLoginOtp(customerId, otpCode);
   }
 
   async signup(signupData: SignupRequestPayload): Promise<ApiResponse> {
@@ -925,6 +925,54 @@ class ApiService {
       method: 'PUT',
       body: JSON.stringify(payload),
     });
+  }
+
+  async requestBundleTagEvaluation(
+    id: number
+  ): Promise<ApiResponse<RequestBundleTagEvaluationResponse>> {
+    const endpoint = config.endpoints.bundles.requestTagEvaluation.replace(
+      ':id',
+      encodeURIComponent(String(id))
+    );
+
+    return this.request<RequestBundleTagEvaluationResponse>(endpoint, {
+      method: 'POST',
+    });
+  }
+
+  async getBundleTagEvaluationStatus(
+    id: number,
+    signal?: AbortSignal
+  ): Promise<ApiResponse<GetBundleTagEvaluationStatusResponse>> {
+    const endpoint = config.endpoints.bundles.tagEvaluationStatus.replace(
+      ':id',
+      encodeURIComponent(String(id))
+    );
+
+    return this.request<GetBundleTagEvaluationStatusResponse>(endpoint, {
+      method: 'GET',
+      signal,
+    });
+  }
+
+  async listBundleTagScores(
+    id: number,
+    params: ListBundleTagScoresParams,
+    signal?: AbortSignal
+  ): Promise<ApiResponse<ListBundleTagScoresResponse>> {
+    const query = new URLSearchParams({
+      page: String(params.page),
+      limit: String(params.limit),
+    });
+    const path = config.endpoints.bundles.tagScores.replace(
+      ':id',
+      encodeURIComponent(String(id))
+    );
+
+    return this.request<ListBundleTagScoresResponse>(
+      `${path}?${query.toString()}`,
+      { method: 'GET', signal }
+    );
   }
 
   async getCampaigns(): Promise<ApiResponse> {

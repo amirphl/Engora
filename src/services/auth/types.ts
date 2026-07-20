@@ -10,14 +10,31 @@ export interface AuthApiResponse<T = any> {
   error?: AuthErrorDetail;
 }
 
-export interface LoginSuccessPayload {
-  customer: any;
-  access_token: string;
-  refresh_token: string;
+export interface AuthCustomerDTO {
+  id: number;
+  uuid: string;
+  email: string;
+  representative_first_name: string;
+  representative_last_name: string;
+  representative_mobile: string;
+  account_type: string;
+  company_name?: string;
+  is_active?: boolean;
+  is_email_verified?: boolean;
+  is_mobile_verified?: boolean;
+  created_at: string;
+  referrer_agency_id?: number;
 }
 
-export interface LoginOtpRequestPayload {
-  customer_id?: number;
-  customerId?: number;
-  otp_sent?: boolean;
+export interface CustomerSessionDTO {
+  access_token: string;
+  refresh_token: string;
+  expires_in?: number;
+  token_type?: string;
+  created_at?: string;
+}
+
+export interface LoginResponse {
+  Customer: AuthCustomerDTO;
+  Session: CustomerSessionDTO;
 }

@@ -152,6 +152,43 @@ export interface BundlesCopy {
       disabled: string;
       notAvailable: string;
     };
+    tagEvaluation: {
+      title: string;
+      description: string;
+      evaluateButton: string;
+      lastEvaluated: string;
+      evaluatingNotice: string;
+      staleNotice: string;
+      evaluationError: string;
+      statuses: {
+        notEvaluated: string;
+        evaluating: string;
+        evaluated: string;
+        updateRequired: string;
+        error: string;
+      };
+      table: {
+        tag: string;
+        score: string;
+        audience: string;
+        fitLevel: string;
+        relation: string;
+        reason: string;
+        empty: string;
+      };
+      pagination: {
+        previous: string;
+        next: string;
+        rowsPerPage: string;
+        showing: string;
+      };
+      messages: {
+        requestAccepted: string;
+        requestFailed: string;
+        statusLoadFailed: string;
+        scoresLoadFailed: string;
+      };
+    };
   };
 }
 
@@ -313,6 +350,46 @@ const bundlesEn: BundlesCopy = {
       disabled: 'Disabled',
       notAvailable: 'Not available',
     },
+    tagEvaluation: {
+      title: 'Smart Tag Evaluation',
+      description:
+        'Evaluate available tags against this bundle’s target audience persona.',
+      evaluateButton: 'Evaluate Tags',
+      lastEvaluated: 'Last evaluated: {date}',
+      evaluatingNotice:
+        'Evaluation is running. The latest successful scores remain available below.',
+      staleNotice:
+        'The target audience persona has changed. These scores remain available until you evaluate again.',
+      evaluationError: 'The latest evaluation failed.',
+      statuses: {
+        notEvaluated: 'Not Evaluated',
+        evaluating: 'Evaluating',
+        evaluated: 'Evaluated',
+        updateRequired: 'Update Required',
+        error: 'Error',
+      },
+      table: {
+        tag: 'Tag',
+        score: 'Bundle Fit Score',
+        audience: 'Audience Count',
+        fitLevel: 'Fit Level',
+        relation: 'Relation',
+        reason: 'Reason',
+        empty: 'No evaluated tag scores are available yet.',
+      },
+      pagination: {
+        previous: 'Previous',
+        next: 'Next',
+        rowsPerPage: 'Rows per page',
+        showing: 'Showing {from} to {to} of {total} tags',
+      },
+      messages: {
+        requestAccepted: 'Tag evaluation started.',
+        requestFailed: 'Failed to start tag evaluation.',
+        statusLoadFailed: 'Failed to load the tag evaluation status.',
+        scoresLoadFailed: 'Failed to load evaluated tag scores.',
+      },
+    },
   },
 };
 
@@ -473,6 +550,46 @@ const bundlesFa: BundlesCopy = {
       enabled: 'فعال',
       disabled: 'غیرفعال',
       notAvailable: 'موجود نیست',
+    },
+    tagEvaluation: {
+      title: 'ارزیابی هوشمند برچسب‌ها',
+      description:
+        'برچسب‌های موجود را با پرسونای مخاطب هدف این کمپین ارزیابی کنید.',
+      evaluateButton: 'ارزیابی برچسب‌ها',
+      lastEvaluated: 'آخرین ارزیابی: {date}',
+      evaluatingNotice:
+        'ارزیابی در حال انجام است. آخرین امتیازهای موفق در پایین قابل مشاهده هستند.',
+      staleNotice:
+        'پرسونای مخاطب هدف تغییر کرده است. این امتیازها تا ارزیابی دوباره در دسترس می‌مانند.',
+      evaluationError: 'آخرین ارزیابی ناموفق بود.',
+      statuses: {
+        notEvaluated: 'ارزیابی نشده',
+        evaluating: 'در حال ارزیابی',
+        evaluated: 'ارزیابی شده',
+        updateRequired: 'نیازمند به‌روزرسانی',
+        error: 'خطا',
+      },
+      table: {
+        tag: 'برچسب',
+        score: 'امتیاز تناسب کمپین',
+        audience: 'تعداد مخاطب',
+        fitLevel: 'سطح تناسب',
+        relation: 'نوع ارتباط',
+        reason: 'دلیل',
+        empty: 'هنوز امتیازی برای برچسب‌ها موجود نیست.',
+      },
+      pagination: {
+        previous: 'قبلی',
+        next: 'بعدی',
+        rowsPerPage: 'تعداد در صفحه',
+        showing: 'نمایش {from} تا {to} از {total} برچسب',
+      },
+      messages: {
+        requestAccepted: 'ارزیابی برچسب‌ها آغاز شد.',
+        requestFailed: 'شروع ارزیابی برچسب‌ها ناموفق بود.',
+        statusLoadFailed: 'دریافت وضعیت ارزیابی برچسب‌ها ناموفق بود.',
+        scoresLoadFailed: 'دریافت امتیازهای برچسب‌ها ناموفق بود.',
+      },
     },
   },
 };

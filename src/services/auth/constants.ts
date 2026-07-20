@@ -1,7 +1,6 @@
 export const AUTH_ENDPOINTS = {
   login: '/auth/login',
   loginOtp: '/auth/login/otp',
-  loginOtpVerify: '/auth/login/otp/verify',
 } as const;
 
 export const OTP_CODE_LENGTH = 6;

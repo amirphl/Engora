@@ -10,6 +10,7 @@ import BundleEditSection from './bundles/components/BundleEditSection';
 import BundleDetailHeader from './bundles/components/BundleDetailHeader';
 import BundleLinkDetailsSection from './bundles/components/BundleLinkDetailsSection';
 import BundleOverviewSection from './bundles/components/BundleOverviewSection';
+import BundleTagEvaluationSection from './bundles/components/BundleTagEvaluationSection';
 import BundleQuickAccessSection from './bundles/components/BundleQuickAccessSection';
 import { useBundleDetails } from './bundles/hooks/useBundleDetails';
 import { getBundlesCopy } from './bundles/translations';
@@ -207,6 +208,7 @@ const BundleDetailPage: React.FC = () => {
               copy={copy}
               onEdit={() => setIsEditing(true)}
             />
+            <BundleTagEvaluationSection bundle={bundle} copy={copy} />
             <BundleLinkDetailsSection bundle={bundle} copy={copy} />
             <BundleQuickAccessSection
               copy={copy}

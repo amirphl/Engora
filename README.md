@@ -8,7 +8,7 @@ A modern web application to create and manage targeted SMS marketing campaigns. 
 - **Authentication**: Phone/OTP-based login with robust 401 handling and reliable redirects
 - **Campaign Wizard (4 Steps)**:
   - Segment: title, segment, subsegments, sex, cities; capacity auto-calculated and persisted
-  - Content: link insertion with marker (🔗), Shamsi/Gregorian datetime (24h), strict validation
+  - Content: link insertion with marker ({YOUR_LINK}), Shamsi/Gregorian datetime (24h), strict validation
   - Budget: debounced API calls, estimated messages (msg_target/max_msg_target), max budget enforced
   - Payment: cost breakdown from API (sub_total/tax/total), wallet balance check, finish calls Update API
 - **Debounced Inputs**: Budget and report filters avoid API bombardment
