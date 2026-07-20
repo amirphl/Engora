@@ -35,6 +35,11 @@ export interface CustomerSessionDTO {
 }
 
 export interface LoginResponse {
-  Customer: AuthCustomerDTO;
-  Session: CustomerSessionDTO;
+  Customer?: AuthCustomerDTO;
+  Session?: CustomerSessionDTO;
+  customer?: AuthCustomerDTO;
+  access_token?: string;
+  refresh_token?: string;
+  expires_in?: number;
+  token_type?: string;
 }

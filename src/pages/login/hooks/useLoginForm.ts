@@ -37,17 +37,20 @@ interface ParsedLoginResponse {
 const parseLoginResponse = (value: unknown): ParsedLoginResponse | null => {
   if (!value || typeof value !== 'object') return null;
 
-  const candidate = value as Partial<LoginResponse> & {
-    customer?: AuthCustomerDTO;
-    session?: CustomerSessionDTO;
-  };
+  const candidate = value as Partial<LoginResponse>;
   const customer = candidate.Customer ?? candidate.customer;
-  const session = candidate.Session ?? candidate.session;
+  const session = candidate.Session ?? {
+    access_token: candidate.access_token,
+    refresh_token: candidate.refresh_token,
+    expires_in: candidate.expires_in,
+    token_type: candidate.token_type,
+  };
 
   if (
     !customer ||
     typeof customer.id !== 'number' ||
     typeof customer.uuid !== 'string' ||
+    !customer.uuid.trim() ||
     typeof customer.account_type !== 'string' ||
     !session ||
     typeof session.access_token !== 'string' ||
@@ -58,7 +61,14 @@ const parseLoginResponse = (value: unknown): ParsedLoginResponse | null => {
     return null;
   }
 
-  return { customer, session };
+  return {
+    customer,
+    session: {
+      ...session,
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+    },
+  };
 };
 
 export const useLoginForm = ({ language, strings }: UseLoginFormOptions) => {

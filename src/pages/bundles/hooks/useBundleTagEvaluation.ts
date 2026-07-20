@@ -13,7 +13,7 @@ import bundlesApi from '../api';
 import { BundlesCopy } from '../translations';
 import { normalizeBundleTagEvaluationStatus } from '../tagEvaluationUtils';
 
-const POLL_INTERVAL_MS = 3000;
+const POLL_INTERVAL_MS = 10000;
 const DEFAULT_PAGE_SIZE = 20;
 
 const defaultPagination = (limit = DEFAULT_PAGE_SIZE): BundlePagination => ({
