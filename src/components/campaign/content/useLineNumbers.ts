@@ -1,95 +1,100 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { apiService } from '../../../services/api';
 import { useToast } from '../../../hooks/useToast';
 
-// Module-level cache and flags to avoid duplicate fetches
 type LineNumberOption = { value: string; label: string; priceFactor?: number };
 
-let activeLineNumbersCache: Array<LineNumberOption> | null = null;
-let activeLineNumbersFetchInFlight: Promise<Array<LineNumberOption>> | null =
-  null;
-let fetchAttempted = false; // Track if we've already tried fetching (success or failure)
+const activeLineNumbersCache = new Map<string, LineNumberOption[]>();
+const activeLineNumbersFetchInFlight = new Map<
+  string,
+  Promise<LineNumberOption[]>
+>();
 
 export const useLineNumbers = (accessToken: string | null) => {
   const [lineNumberOptions, setLineNumberOptions] = useState<
-    Array<LineNumberOption>
+    LineNumberOption[]
   >([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(Boolean(accessToken));
   const [error, setError] = useState<string | null>(null);
   const { showToast } = useToast();
+  const showToastRef = useRef(showToast);
 
   useEffect(() => {
-    if (!accessToken) return;
+    showToastRef.current = showToast;
+  }, [showToast]);
 
-    // Ensure API client has the latest token before fetching (avoids rare race where Authorization is missing)
-    apiService.setAccessToken(accessToken);
-
-    // Use cached data if available
-    if (activeLineNumbersCache) {
-      setLineNumberOptions(activeLineNumbersCache);
-      return;
-    }
-
-    // If we already attempted and failed, don't retry automatically
-    if (fetchAttempted && !activeLineNumbersFetchInFlight) {
-      setError('Failed to load line numbers');
-      return;
-    }
-
-    // Wait for in-flight request if one exists
-    if (activeLineNumbersFetchInFlight) {
-      setIsLoading(true);
+  useEffect(() => {
+    if (!accessToken) {
+      setLineNumberOptions([]);
+      setIsLoading(false);
       setError(null);
-      activeLineNumbersFetchInFlight
-        .then(opts => {
-          setLineNumberOptions(opts);
-          setIsLoading(false);
-        })
-        .catch(() => {
-          setError('Failed to load line numbers');
-          setIsLoading(false);
-        });
       return;
     }
 
-    // Start new fetch (only if not attempted before)
-    if (fetchAttempted) return;
+    apiService.setAccessToken(accessToken);
+    let isActive = true;
 
-    fetchAttempted = true; // Mark as attempted before starting
+    const cached = activeLineNumbersCache.get(accessToken);
+    if (cached) {
+      setLineNumberOptions(cached);
+      setIsLoading(false);
+      setError(null);
+      return () => {
+        isActive = false;
+      };
+    }
+
     setIsLoading(true);
     setError(null);
-    activeLineNumbersFetchInFlight = (async () => {
-      const res = await apiService.listActiveLineNumbers();
-      if (!res.success || !res.data) {
-        throw new Error(res.message || 'Failed to load line numbers');
-      }
-      const items = (res.data.items || []) as Array<{
-        line_number: string;
-        price_factor?: number;
-      }>;
-      const opts = items.map(it => ({
-        value: it.line_number,
-        label: it.line_number,
-        priceFactor:
-          typeof it.price_factor === 'number' ? it.price_factor : undefined,
-      }));
-      return opts;
-    })();
+    let request = activeLineNumbersFetchInFlight.get(accessToken);
+    if (!request) {
+      request = (async () => {
+        const res = await apiService.listActiveLineNumbers();
+        if (!res.success || !res.data) {
+          throw new Error(res.message || 'Failed to load line numbers');
+        }
+        const items = (res.data.items || []) as Array<{
+          line_number: string;
+          price_factor?: number;
+        }>;
+        return items.map(item => ({
+          value: item.line_number,
+          label: item.line_number,
+          priceFactor:
+            typeof item.price_factor === 'number'
+              ? item.price_factor
+              : undefined,
+        }));
+      })();
+      activeLineNumbersFetchInFlight.set(accessToken, request);
+    }
 
-    activeLineNumbersFetchInFlight
-      .then(opts => {
-        activeLineNumbersCache = opts;
-        setLineNumberOptions(opts);
+    request
+      .then(options => {
+        activeLineNumbersCache.set(accessToken, options);
+        if (!isActive) return;
+        setLineNumberOptions(options);
+        setError(null);
       })
-      .catch(() => {
-        setError('Failed to load line numbers');
-        showToast('error', 'Failed to load line numbers');
+      .catch((err: unknown) => {
+        if (!isActive) return;
+        const message =
+          err instanceof Error ? err.message : 'Failed to load line numbers';
+        setError(message);
+        showToastRef.current('error', message);
       })
       .finally(() => {
+        if (activeLineNumbersFetchInFlight.get(accessToken) === request) {
+          activeLineNumbersFetchInFlight.delete(accessToken);
+        }
+        if (!isActive) return;
         setIsLoading(false);
-        activeLineNumbersFetchInFlight = null;
       });
-  }, [accessToken, showToast]);
+
+    return () => {
+      isActive = false;
+    };
+  }, [accessToken]);
 
   return { lineNumberOptions, isLoading, error };
 };

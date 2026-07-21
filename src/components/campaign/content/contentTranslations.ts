@@ -29,7 +29,9 @@ const contentEn = {
   campaignScheduled: 'Campaign will be scheduled',
   campaignImmediate: 'Campaign will be sent immediately after approval.',
   scheduleDateTime: 'Schedule Date & Time',
-  scheduleTooSoon: 'Please pick a time at least 20 minutes from now',
+  scheduleTooSoon: 'Please pick a time at least 10 minutes from now',
+  scheduleOutsideWindow:
+    'Delivery time must be between 08:00 and 21:00 Tehran time',
 
   // Message text section
   text: 'Text',
@@ -124,7 +126,9 @@ const contentFa = {
   campaignScheduled: 'کمپین زمان‌بندی خواهد شد.',
   campaignImmediate: 'کمپین بلافاصله بعد از تایید ارسال می‌شود.',
   scheduleDateTime: 'تاریخ و زمان زمان‌بندی',
-  scheduleTooSoon: 'لطفاً زمانی حداقل ۲۰ دقیقه بعد از اکنون انتخاب کنید',
+  scheduleTooSoon: 'لطفاً زمانی حداقل ۱۰ دقیقه بعد از اکنون انتخاب کنید',
+  scheduleOutsideWindow:
+    'زمان ارسال باید بین ساعت ۰۸:۰۰ تا ۲۱:۰۰ به وقت تهران باشد',
 
   // Message text section
   text: 'متن',

@@ -194,6 +194,58 @@ export const ERROR_MESSAGES: Record<string, ErrorMessage> = {
     en: 'Invalid campaign schedule provided',
     fa: 'زمان‌بندی کمپین نامعتبر است',
   },
+  CAMPAIGN_AUDIENCE_TARGETING_METHOD_INVALID: {
+    en: 'Please select a valid audience targeting method',
+    fa: 'لطفاً یک روش هدف‌گیری معتبر انتخاب کنید',
+  },
+  SMART_TARGETING_TAGS_REQUIRED: {
+    en: 'At least one tag must be selected for Smart Targeting',
+    fa: 'برای هدف‌گیری هوشمند حداقل یک برچسب باید انتخاب شود',
+  },
+  SMART_TARGETING_TAG_INVALID: {
+    en: 'One or more selected Smart Targeting tags are invalid',
+    fa: 'یک یا چند برچسب هدف‌گیری هوشمند نامعتبر است',
+  },
+  SMART_TARGETING_SORT_INVALID: {
+    en: 'The selected Smart Targeting sort option is not available',
+    fa: 'گزینه مرتب‌سازی هدف‌گیری هوشمند در دسترس نیست',
+  },
+  SMART_TARGETING_SCORE_UNAVAILABLE: {
+    en: 'Bundle persona fit score sorting is unavailable for this bundle',
+    fa: 'مرتب‌سازی بر اساس امتیاز تناسب پرسونا برای این کمپین در دسترس نیست',
+  },
+  SMART_TARGETING_SEARCH_TOO_LONG: {
+    en: 'Smart Targeting search must be 200 characters or fewer',
+    fa: 'جستجوی هدف‌گیری هوشمند باید حداکثر ۲۰۰ کاراکتر باشد',
+  },
+  SMART_TARGETING_COUNT_INVALID: {
+    en: 'Enter a valid number of tags for automatic selection',
+    fa: 'تعداد معتبری برای انتخاب خودکار برچسب‌ها وارد کنید',
+  },
+  SMART_TARGETING_SELECTION_INVALID: {
+    en: 'At least one tag must be selected for Smart Targeting',
+    fa: 'برای هدف‌گیری هوشمند حداقل یک برچسب باید انتخاب شود',
+  },
+  SMART_TARGETING_TAG_LIST_FAILED: {
+    en: 'Failed to load Smart Targeting tags. Please try again',
+    fa: 'بارگذاری برچسب‌های هدف‌گیری هوشمند ناموفق بود. لطفاً دوباره تلاش کنید',
+  },
+  SMART_TARGETING_SELECTION_LOOKUP_FAILED: {
+    en: 'Failed to load the saved Smart Targeting selection',
+    fa: 'بارگذاری انتخاب ذخیره‌شده هدف‌گیری هوشمند ناموفق بود',
+  },
+  SMART_TARGETING_SELECTION_SAVE_FAILED: {
+    en: 'Failed to save Smart Targeting selection. Please try again',
+    fa: 'ذخیره انتخاب هدف‌گیری هوشمند ناموفق بود. لطفاً دوباره تلاش کنید',
+  },
+  SMART_TARGETING_AUTO_SELECT_INVALID: {
+    en: 'Enter a valid number of tags for automatic selection',
+    fa: 'تعداد معتبری برای انتخاب خودکار برچسب‌ها وارد کنید',
+  },
+  SMART_TARGETING_AUTO_SELECT_FAILED: {
+    en: 'Failed to automatically select Smart Targeting tags. Please try again',
+    fa: 'انتخاب خودکار برچسب‌های هدف‌گیری هوشمند ناموفق بود. لطفاً دوباره تلاش کنید',
+  },
 
   // Bundle errors
   INVALID_BUNDLE_ID: {
@@ -257,6 +309,10 @@ export const ERROR_MESSAGES: Record<string, ErrorMessage> = {
     fa: 'شماره صفحه نامعتبر است',
   },
   INVALID_LIMIT: {
+    en: 'Invalid page size provided',
+    fa: 'تعداد نمایش در صفحه نامعتبر است',
+  },
+  INVALID_PAGE_SIZE: {
     en: 'Invalid page size provided',
     fa: 'تعداد نمایش در صفحه نامعتبر است',
   },

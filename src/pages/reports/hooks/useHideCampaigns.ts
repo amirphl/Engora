@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { apiService } from '../../../services/api';
 import { useAuth } from '../../../hooks/useAuth';
 import { useLanguage } from '../../../hooks/useLanguage';
@@ -19,9 +19,11 @@ export const useHideCampaigns = ({
   const { language } = useLanguage();
   const { showError, showSuccess } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
 
   const hideCampaigns = useCallback(
     async (campaignIds: number[]) => {
+      if (isSubmittingRef.current) return false;
       if (campaignIds.length === 0) {
         showError(copy.bulkHide.errors.emptySelection);
         return false;
@@ -32,6 +34,7 @@ export const useHideCampaigns = ({
         return false;
       }
 
+      isSubmittingRef.current = true;
       setIsSubmitting(true);
 
       try {
@@ -62,6 +65,7 @@ export const useHideCampaigns = ({
         showError(copy.bulkHide.errors.fallback);
         return false;
       } finally {
+        isSubmittingRef.current = false;
         setIsSubmitting(false);
       }
     },

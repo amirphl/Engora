@@ -522,7 +522,7 @@ export const translations = {
       tryAgain: 'Please try again.',
       errors: {
         scheduleTimeTooSoon:
-          'Schedule time must be at least 20 minutes in the future. Go back to Step 2 to set a valid schedule time.',
+          'Schedule time must be at least 10 minutes in the future. Go back to Step 2 to set a valid schedule time.',
         invalidScheduleTime:
           'Schedule time is invalid. Go back to Step 2 to set a valid schedule time.',
       },
@@ -1257,7 +1257,7 @@ export const translations = {
       tryAgain: 'لطفاً دوباره تلاش کنید.',
       errors: {
         scheduleTimeTooSoon:
-          'زمان‌بندی باید حداقل ۲۰ دقیقه بعد از زمان فعلی باشد. برای اصلاح زمان‌بندی به مرحله ۲ بازگردید.',
+          'زمان‌بندی باید حداقل ۱۰ دقیقه بعد از زمان فعلی باشد. برای اصلاح زمان‌بندی به مرحله ۲ بازگردید.',
         invalidScheduleTime:
           'زمان‌بندی نامعتبر است. برای اصلاح زمان‌بندی به مرحله ۲ بازگردید.',
       },

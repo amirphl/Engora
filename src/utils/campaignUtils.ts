@@ -9,22 +9,92 @@ import { CampaignData, UpdateSMSCampaignRequest } from '../types/campaign';
  */
 export const LINK_PLACEHOLDER = '{YOUR_LINK}';
 export const DEFAULT_SHORT_LINK_DOMAIN = 'jo1n.ir';
+export const ALLOWED_SHORT_LINK_DOMAINS = [
+  DEFAULT_SHORT_LINK_DOMAIN,
+  'joinsahel.ir',
+] as const;
+export const MIN_SCHEDULE_LEAD_TIME_MS = 10 * 60 * 1000;
+export const DEFAULT_FINALIZE_SCHEDULE_DELAY_MS = 20 * 60 * 1000;
+export const MAX_CAMPAIGN_STRING_LENGTH = 255;
+export const MAX_CAMPAIGN_ARRAY_ITEMS = 255;
+
+const UUID_V4_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export const isUuidV4 = (value: unknown): value is string =>
+  typeof value === 'string' && UUID_V4_PATTERN.test(value.trim());
+
+export const isValidCampaignStringArray = (
+  value: unknown,
+  options: { required?: boolean } = {}
+): value is string[] => {
+  if (!Array.isArray(value)) return false;
+  if (options.required && value.length === 0) return false;
+  return (
+    value.length <= MAX_CAMPAIGN_ARRAY_ITEMS &&
+    value.every(
+      item =>
+        typeof item === 'string' &&
+        item.trim().length > 0 &&
+        item.length <= MAX_CAMPAIGN_STRING_LENGTH
+    )
+  );
+};
 
 export const normalizeLinkPlaceholder = (text: string): string =>
   text
     .replace(/\{YOUR_LINK\}/gi, LINK_PLACEHOLDER)
     .replace(/\u{1F517}/gu, LINK_PLACEHOLDER)
-    .replace(/jo1n\.ir\/xxxxxx/gi, LINK_PLACEHOLDER);
+    .replace(/(?:jo1n|joinsahel)\.ir\/xxxxxx/gi, LINK_PLACEHOLDER);
 
 export const hasLinkPlaceholder = (text: string): boolean =>
   normalizeLinkPlaceholder(text).includes(LINK_PLACEHOLDER);
 
-export const getShortLinkDomainOrDefault = (
-  shortLinkDomain?: string | null
-): string =>
-  shortLinkDomain && shortLinkDomain.trim()
-    ? shortLinkDomain.trim()
-    : DEFAULT_SHORT_LINK_DOMAIN;
+export const isValidCampaignUrl = (value: string): boolean => {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > 10000) return false;
+
+  for (let index = 0; index < trimmed.length; index += 1) {
+    const code = trimmed.charCodeAt(index);
+    if (
+      (code >= 0 && code <= 8) ||
+      code === 11 ||
+      code === 12 ||
+      (code >= 14 && code <= 31) ||
+      code === 127
+    ) {
+      return false;
+    }
+  }
+
+  try {
+    const url = new URL(trimmed);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+};
+
+export const isScheduleWithinTehranWindow = (value: string | Date): boolean => {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return false;
+
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Tehran',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    }).formatToParts(date);
+    const hour = Number(parts.find(part => part.type === 'hour')?.value);
+    const minute = Number(parts.find(part => part.type === 'minute')?.value);
+    if (!Number.isInteger(hour) || !Number.isInteger(minute)) return false;
+    const minutes = hour * 60 + minute;
+    return minutes >= 8 * 60 && minutes <= 21 * 60;
+  } catch {
+    return false;
+  }
+};
 
 export const countCharacters = (
   text: string,
@@ -146,22 +216,18 @@ export const validateCampaignContent = (
     return { isValid: false, error: 'Please enter text content' };
   }
 
-  if (platform !== 'sms') {
-    const charCount = (content.text || '').length;
-    if (charCount > 1000) {
-      return {
-        isValid: false,
-        error: 'Text exceeds maximum length (1000 characters)',
-      };
-    }
-    return { isValid: true, error: null };
-  }
-
   // Check if link is provided when link insertion is enabled
   if (content.insertLink && !content.link?.trim()) {
     return {
       isValid: false,
       error: 'Please provide a link when link insertion is enabled',
+    };
+  }
+
+  if (content.insertLink && content.link && !isValidCampaignUrl(content.link)) {
+    return {
+      isValid: false,
+      error: 'Please provide a valid HTTP or HTTPS campaign link',
     };
   }
 
@@ -176,17 +242,58 @@ export const validateCampaignContent = (
     };
   }
 
-  // Scheduling is optional. If provided, require at least 20 minutes in the future
-  const nowMs = Date.now();
-  const minScheduleMs = nowMs + 20 * 60 * 1000;
+  if (
+    content.insertLink &&
+    content.shortLinkDomain &&
+    !ALLOWED_SHORT_LINK_DOMAINS.includes(
+      content.shortLinkDomain.trim() as (typeof ALLOWED_SHORT_LINK_DOMAINS)[number]
+    )
+  ) {
+    return {
+      isValid: false,
+      error: 'Please select a supported short-link domain',
+    };
+  }
+
+  // The backend finalizes an unscheduled campaign at now + 20 minutes.
   if (content.scheduleAt) {
     const scheduledMs = new Date(content.scheduleAt).getTime();
-    if (Number.isNaN(scheduledMs) || scheduledMs < minScheduleMs) {
+    if (
+      Number.isNaN(scheduledMs) ||
+      scheduledMs < Date.now() + MIN_SCHEDULE_LEAD_TIME_MS
+    ) {
       return {
         isValid: false,
-        error: 'Please select a schedule at least 20 minutes from now',
+        error: 'Please select a schedule at least 10 minutes from now',
       };
     }
+    if (!isScheduleWithinTehranWindow(content.scheduleAt)) {
+      return {
+        isValid: false,
+        error: 'Schedule time must be between 08:00 and 21:00 Tehran time',
+      };
+    }
+  } else if (
+    !isScheduleWithinTehranWindow(
+      new Date(Date.now() + DEFAULT_FINALIZE_SCHEDULE_DELAY_MS)
+    )
+  ) {
+    return {
+      isValid: false,
+      error:
+        'Immediate delivery would fall outside 08:00 to 21:00 Tehran time; please schedule the campaign',
+    };
+  }
+
+  if (platform !== 'sms') {
+    const charCount = (content.text || '').length;
+    if (charCount > 1000) {
+      return {
+        isValid: false,
+        error: 'Text exceeds maximum length (1000 characters)',
+      };
+    }
+    return { isValid: true, error: null };
   }
 
   // Check character limit
@@ -219,12 +326,23 @@ export const serializeCampaignPayload = (
   const platform = campaignData.segment.platform || 'sms';
   const targetAudienceExcelFileUuid =
     campaignData.segment.targetAudienceExcelFileUuid;
+  const audienceTargetingMethod =
+    campaignData.segment.audienceTargetingMethod ??
+    (targetAudienceExcelFileUuid != null ? 'excel' : 'standard');
+  const isSmartTargeting = audienceTargetingMethod === 'smart_targeting';
 
   const normalizedTargetAudienceExcelFileUuid =
     typeof targetAudienceExcelFileUuid === 'string' &&
     targetAudienceExcelFileUuid.trim()
       ? targetAudienceExcelFileUuid.trim()
       : null;
+  const selectedTagIds = Array.from(
+    new Set(
+      (campaignData.segment.selectedTagIds || [])
+        .map(item => Number(item))
+        .filter(item => Number.isInteger(item) && item > 0)
+    )
+  );
   const normalizedAdlink =
     campaignData.content.insertLink && campaignData.content.link?.trim()
       ? campaignData.content.link.trim()
@@ -246,6 +364,15 @@ export const serializeCampaignPayload = (
       campaignData.segment.tags && campaignData.segment.tags.length > 0
         ? campaignData.segment.tags
         : undefined,
+    audience_targeting_method: audienceTargetingMethod,
+    selected_tag_ids: isSmartTargeting ? selectedTagIds : undefined,
+    sex: campaignData.segment.sex || undefined,
+    city:
+      campaignData.segment.city && campaignData.segment.city.length > 0
+        ? campaignData.segment.city
+        : undefined,
+    adlink: normalizedAdlink,
+    scheduleat: campaignData.content.scheduleAt,
     line_number:
       platform === 'sms'
         ? campaignData.content.lineNumber
@@ -256,7 +383,7 @@ export const serializeCampaignPayload = (
       campaignData.content.insertLink &&
       campaignData.content.shortLinkDomain?.trim()
         ? campaignData.content.shortLinkDomain.trim()
-        : undefined,
+        : null,
     job_category: campaignData.segment.jobCategory || undefined,
     job: campaignData.segment.job || undefined,
     platform,
@@ -271,9 +398,10 @@ export const serializeCampaignPayload = (
   };
 
   if (options?.includeContent) {
-    payload.adlink = normalizedAdlink;
-    payload.content = normalizeLinkPlaceholder(campaignData.content.text);
-    payload.scheduleat = campaignData.content.scheduleAt;
+    const normalizedContent = normalizeLinkPlaceholder(
+      campaignData.content.text
+    );
+    payload.content = normalizedContent.trim() ? normalizedContent : undefined;
   }
 
   if (options?.includeBudget) {
@@ -284,11 +412,12 @@ export const serializeCampaignPayload = (
     payload.finalize = options.finalize;
   }
 
-  payload.audience_grades =
+  if (
     campaignData.segment.audienceGrades &&
     campaignData.segment.audienceGrades.length > 0
-      ? campaignData.segment.audienceGrades
-      : [];
+  ) {
+    payload.audience_grades = campaignData.segment.audienceGrades;
+  }
 
   return payload;
 };

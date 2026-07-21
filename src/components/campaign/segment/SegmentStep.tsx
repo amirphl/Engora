@@ -27,25 +27,47 @@ import {
 } from '../../../types/segment';
 import {
   AudienceGrade,
+  AudienceTargetingMethod,
   CampaignData,
+  CampaignPhase,
   CampaignPlatform,
 } from '../../../types/campaign';
-import {
-  getLayer3Stat,
-  calcTotalCapacity,
-  calcGradeCapacity,
-} from '../../../data/layer3Stats';
+import { getLayer3Stat, calcGradeCapacity } from '../../../data/layer3Stats';
 import { campaignLevelI18n } from './segmentTranslations';
 import { useLanguage } from '../../../hooks/useLanguage';
 import CategoryJobFields from '../../CategoryJobFields';
 import Button from '../../ui/Button';
 import { useToast } from '../../../hooks/useToast';
 import { useMediaUpload } from '../../../hooks/useMediaUpload';
-import { normalizeLinkPlaceholder } from '../../../utils/campaignUtils';
 import TargetAudienceExcelFileUploadCard, {
   isTargetAudienceExcelFile,
 } from './TargetAudienceExcelFileUploadCard';
 import BundleInfoCard from '../content/BundleInfoCard';
+import SmartTargetingTagsTable from './SmartTargetingTagsTable';
+import {
+  normalizeCampaignResponseToDraft,
+  type SmartTargetingDraftSelection,
+} from '../../../utils/campaignCreationDraft';
+
+const isAudienceTargetingMethod = (
+  value: unknown
+): value is AudienceTargetingMethod =>
+  value === 'standard' || value === 'smart_targeting' || value === 'excel';
+
+const resolveAudienceTargetingMethod = (
+  segment: Partial<CampaignData['segment']>
+): AudienceTargetingMethod => {
+  if (isAudienceTargetingMethod(segment.audienceTargetingMethod)) {
+    return segment.audienceTargetingMethod;
+  }
+  return segment.targetAudienceExcelFileUuid != null ? 'excel' : 'standard';
+};
+
+interface PersistedCampaignContext {
+  uuid: string;
+  bundleId: number | null;
+  audienceTargetingMethod: AudienceTargetingMethod;
+}
 
 const LevelStep: React.FC = () => {
   const { language } = useLanguage();
@@ -56,9 +78,8 @@ const LevelStep: React.FC = () => {
     campaignData,
     updateLevel,
     updateContent,
-    updateBudget,
-    setCampaignId,
-    setCampaignUuid,
+    replaceCampaignData,
+    resetCampaign,
   } = useCampaign();
   const { accessToken, user } = useAuth();
   const { showError } = useToast();
@@ -104,14 +125,33 @@ const LevelStep: React.FC = () => {
     useState<string | null>(null);
   const isTargetAudienceExcelFileModeByValue = (value: unknown): boolean =>
     value !== null && value !== undefined;
-  const isTargetAudienceExcelFileMode = isTargetAudienceExcelFileModeByValue(
-    campaignData.segment.targetAudienceExcelFileUuid
+  const audienceTargetingMethod = resolveAudienceTargetingMethod(
+    campaignData.segment
   );
+  const isTargetAudienceExcelFileMode = audienceTargetingMethod === 'excel';
+  const isSmartTargetingMode = audienceTargetingMethod === 'smart_targeting';
+  const [persistedCampaignContext, setPersistedCampaignContext] =
+    useState<PersistedCampaignContext | null>(() =>
+      campaignData.uuid
+        ? {
+            uuid: campaignData.uuid,
+            bundleId: campaignData.segment.bundleId ?? null,
+            audienceTargetingMethod,
+          }
+        : null
+    );
+  const canUseCampaignSmartTargetingApis =
+    persistedCampaignContext?.uuid === campaignData.uuid &&
+    persistedCampaignContext.bundleId ===
+      (campaignData.segment.bundleId ?? null) &&
+    persistedCampaignContext.audienceTargetingMethod === 'smart_targeting';
 
   // Track if initialization has already happened
   const initializedRef = useRef(false);
   const lastInitiatedFetchedRef = useRef(false);
   const lastInitiatedInFlightRef = useRef(false);
+  const excelUploadSequenceRef = useRef(0);
+  const targetingModeSequenceRef = useRef(0);
   const campaignDataRef = useRef(campaignData);
   // Fetch audience spec on mount
   const {
@@ -123,6 +163,23 @@ const LevelStep: React.FC = () => {
   useEffect(() => {
     campaignDataRef.current = campaignData;
   }, [campaignData]);
+
+  useEffect(() => {
+    setPersistedCampaignContext(current => {
+      if (!campaignData.uuid) return null;
+      if (current?.uuid === campaignData.uuid) return current;
+
+      return {
+        uuid: campaignData.uuid,
+        bundleId: campaignData.segment.bundleId ?? null,
+        audienceTargetingMethod,
+      };
+    });
+  }, [
+    audienceTargetingMethod,
+    campaignData.segment.bundleId,
+    campaignData.uuid,
+  ]);
 
   const hasLocalDraftCampaign = useCallback(() => {
     const current = campaignDataRef.current;
@@ -140,6 +197,14 @@ const LevelStep: React.FC = () => {
         isTargetAudienceExcelFileModeByValue(
           segment.targetAudienceExcelFileUuid
         ) ||
+        segment.audienceTargetingMethod === 'smart_targeting' ||
+        (Array.isArray(segment.selectedTagIds) &&
+          segment.selectedTagIds.length > 0) ||
+        (Array.isArray(segment.audienceGrades) &&
+          segment.audienceGrades.length > 0) ||
+        !!segment.sex ||
+        (Array.isArray(segment.city) && segment.city.length > 0) ||
+        (typeof segment.bundleId === 'number' && segment.bundleId > 0) ||
         !!segment.jobCategory ||
         !!segment.job ||
         !!content.text ||
@@ -163,6 +228,9 @@ const LevelStep: React.FC = () => {
       isTargetAudienceExcelFileModeByValue(
         currentSegment.targetAudienceExcelFileUuid // NOTE: vs current.segment
       ) ||
+      currentSegment.audienceTargetingMethod === 'smart_targeting' ||
+      (Array.isArray(currentSegment.selectedTagIds) &&
+        currentSegment.selectedTagIds.length > 0) ||
       !!targetAudienceExcelFileName;
     if (inState) return true;
 
@@ -179,6 +247,7 @@ const LevelStep: React.FC = () => {
         savedSelection.level1s.length > 0 ||
         savedSelection.level2s.length > 0 ||
         savedSelection.level3s.length > 0 ||
+        savedSelection.selectedTagIds.length > 0 ||
         isTargetAudienceExcelFileModeByValue(
           savedSelection.targetAudienceExcelFileUuid
         )
@@ -211,71 +280,7 @@ const LevelStep: React.FC = () => {
       if (status && status !== 'initiated' && status !== 'in-progress')
         return null;
 
-      const platformValue = (campaign.platform as CampaignPlatform) || 'sms';
-      const capacityValue =
-        typeof campaign.num_audience === 'number'
-          ? campaign.num_audience
-          : typeof campaign.capacity === 'number'
-            ? campaign.capacity
-            : undefined;
-
-      const segment = {
-        campaignTitle: campaign.title || '',
-        level1: campaign.level1 || '',
-        level2s: Array.isArray(campaign.level2s) ? campaign.level2s : [],
-        level3s: Array.isArray(campaign.level3s) ? campaign.level3s : [],
-        targetAudienceExcelFileUuid:
-          campaign.target_audience_excel_file_uuid ?? null,
-        platform: platformValue,
-        tags: Array.isArray(campaign.tags) ? campaign.tags : [],
-        capacityTooLow:
-          typeof capacityValue === 'number'
-            ? capacityValue > 0 && capacityValue < 500
-            : false,
-        capacity: capacityValue,
-        audienceGrades: Array.isArray(campaign.audience_grades)
-          ? campaign.audience_grades
-          : [],
-        jobCategory: campaign.job_category || '',
-        job: campaign.job || '',
-        bundleId: campaign.bundle_id ?? null,
-        phase: campaign.phase ?? undefined,
-      };
-
-      const content = {
-        insertLink: !!campaign.adlink,
-        link: campaign.adlink || '',
-        text: normalizeLinkPlaceholder(campaign.content || ''),
-        scheduleAt: campaign.scheduleat || undefined,
-        shortLinkDomain: campaign.short_link_domain?.trim() || null,
-        lineNumber: campaign.line_number || '',
-        platformSettingsId:
-          platformValue === 'sms'
-            ? null
-            : (campaign.platform_settings_id ?? null),
-        mediaUuid:
-          platformValue === 'sms' ? null : (campaign.media_uuid ?? null),
-      };
-
-      const budget = {
-        totalBudget: typeof campaign.budget === 'number' ? campaign.budget : 0,
-        estimatedMessages:
-          typeof campaign.num_audience === 'number'
-            ? campaign.num_audience
-            : undefined,
-      };
-
-      return {
-        id:
-          typeof campaign.id === 'number' && campaign.id > 0
-            ? campaign.id
-            : undefined,
-        uuid: campaign.uuid || '',
-        segment,
-        content,
-        budget,
-        payment: { paymentMethod: '', termsAccepted: false },
-      };
+      return normalizeCampaignResponseToDraft(campaign);
     },
     [hasLocalDraftCampaign]
   );
@@ -302,17 +307,13 @@ const LevelStep: React.FC = () => {
     let canceled = false;
 
     const fetchLastInitiatedCampaign = async () => {
-      // TODO: Not reviewed
       if (hasLocalDraftCampaign()) return;
 
       apiService.setAccessToken(accessToken);
       const response = await apiService.getLastInitiatedCampaign();
-      //   console.log('0- Fetched last initiated campaign response:', response);
       if (canceled) return;
-      //   console.log('1- Fetched last initiated campaign:', response);
       // User might have started typing while the request was in-flight
       if (hasLocalDraftCampaign()) return;
-      //   console.log('2- No local draft, processing fetched campaign');
 
       if (!response.success || !response.data) {
         if (!response.success && response.message) {
@@ -320,21 +321,72 @@ const LevelStep: React.FC = () => {
         }
         return;
       }
-      //   console.log('3- Normalizing last initiated campaign data');
 
-      const normalized = normalizeLastInitiatedCampaign(response.data);
+      const sourceCampaign = response.data.item;
+      if (!sourceCampaign) return;
+
+      let normalized = normalizeLastInitiatedCampaign(sourceCampaign);
       if (!normalized || !normalized.uuid) return;
-      //   console.log('4- Normalized campaign data:', normalized);
 
-      // TODO: Not reviewed
+      let smartTargetingSelection: SmartTargetingDraftSelection | undefined;
+      if (
+        resolveAudienceTargetingMethod(normalized.segment) === 'smart_targeting'
+      ) {
+        const selectionResponse =
+          await apiService.getCampaignSmartTargetingSelection(
+            sourceCampaign.uuid
+          );
+        if (canceled || hasLocalDraftCampaign()) return;
+        if (!selectionResponse.success || !selectionResponse.data) {
+          showErrorRef.current(
+            selectionResponse.message ||
+              'Failed to restore the Smart Targeting selection'
+          );
+          return;
+        }
+
+        smartTargetingSelection = {
+          selectedTagIds: Array.from(
+            new Set(
+              (selectionResponse.data.selected_tag_ids || []).filter(
+                tagId => Number.isInteger(tagId) && tagId > 0
+              )
+            )
+          ),
+          selectedRawCapacity:
+            typeof selectionResponse.data.summary?.selected_raw_capacity ===
+              'number' &&
+            Number.isFinite(
+              selectionResponse.data.summary.selected_raw_capacity
+            )
+              ? Math.max(
+                  0,
+                  selectionResponse.data.summary.selected_raw_capacity
+                )
+              : 0,
+        };
+      }
+
+      const sourceStatus = sourceCampaign.status?.toLowerCase();
+      if (sourceStatus === 'in-progress') {
+        normalized = normalizeCampaignResponseToDraft(sourceCampaign, {
+          id: null,
+          uuid: '',
+          clearSchedule: true,
+          smartTargetingSelection,
+          smartTargetingSelectionDirty: Boolean(smartTargetingSelection),
+        });
+      } else if (smartTargetingSelection) {
+        normalized = normalizeCampaignResponseToDraft(sourceCampaign, {
+          smartTargetingSelection,
+          smartTargetingSelectionDirty: false,
+        });
+      }
+
       // Avoid overriding if user created a draft while normalization/persist work is happening.
       if (hasLocalDraftCampaign()) return;
 
       try {
-        localStorage.setItem(
-          'campaign_creation_data',
-          JSON.stringify(normalized)
-        );
         localStorage.setItem('campaign_creation_step', '1');
         saveLevelSelection({
           campaignTitle: normalized.segment.campaignTitle || '',
@@ -343,6 +395,11 @@ const LevelStep: React.FC = () => {
           level3s: normalized.segment.level3s || [],
           targetAudienceExcelFileUuid:
             normalized.segment.targetAudienceExcelFileUuid ?? null,
+          audienceTargetingMethod:
+            normalized.segment.audienceTargetingMethod ?? 'standard',
+          selectedTagIds: normalized.segment.selectedTagIds ?? [],
+          smartTargetingSelectedRawCapacity:
+            normalized.segment.smartTargetingSelectedRawCapacity ?? 0,
           metadata: {},
           tags: normalized.segment.tags || [],
           count: normalized.segment.capacity || 0,
@@ -352,11 +409,7 @@ const LevelStep: React.FC = () => {
         console.warn('Failed to persist last initiated campaign', storageError);
       }
 
-      setCampaignId(normalized.id);
-      setCampaignUuid(normalized.uuid);
-      updateLevel(normalized.segment);
-      updateContent(normalized.content);
-      updateBudget(normalized.budget);
+      replaceCampaignData(normalized, 1);
 
       setCampaignTitle(normalized.segment.campaignTitle || '');
       setPlatform(normalized.segment.platform || 'sms');
@@ -395,12 +448,8 @@ const LevelStep: React.FC = () => {
     accessToken,
     hasLocalDraftCampaign,
     normalizeLastInitiatedCampaign,
-    setCampaignId,
-    setCampaignUuid,
+    replaceCampaignData,
     t.segmentationByTargetAudienceExcelFileUploaded,
-    updateBudget,
-    updateContent,
-    updateLevel,
   ]);
 
   useEffect(() => {
@@ -469,6 +518,7 @@ const LevelStep: React.FC = () => {
 
       // Restore target audience excel mode/upload state.
       if (
+        audienceTargetingMethod !== 'smart_targeting' &&
         campaignData.segment.targetAudienceExcelFileUuid == null &&
         savedSelection.targetAudienceExcelFileUuid != null
       ) {
@@ -485,10 +535,11 @@ const LevelStep: React.FC = () => {
     // Mark as initialized
     initializedRef.current = true;
   }, [
+    audienceTargetingMethod,
     audienceSpec,
     campaignData.segment.targetAudienceExcelFileUuid,
     campaignTitle,
-    hasLocalDraftCampaign, // TODO: Not reviewed
+    hasLocalDraftCampaign,
     level1,
     level3s.length,
     t.segmentationByTargetAudienceExcelFileUploaded,
@@ -496,13 +547,9 @@ const LevelStep: React.FC = () => {
   ]);
 
   const ensureDefaultLevelSelection = useCallback(() => {
-    const hasLocalDraft = hasLocalDraftCampaign(); // TODO: Not reviewed
+    const hasLocalDraft = hasLocalDraftCampaign();
     if (!hasLocalDraft) return;
-    if (
-      !isTargetAudienceExcelFileModeByValue(
-        campaignData.segment.targetAudienceExcelFileUuid
-      )
-    ) {
+    if (!isTargetAudienceExcelFileMode) {
       return;
     }
     if (!audienceSpec) return;
@@ -544,8 +591,8 @@ const LevelStep: React.FC = () => {
     setLevel3s(nextLevel3s);
   }, [
     audienceSpec,
-    campaignData.segment.targetAudienceExcelFileUuid,
-    hasLocalDraftCampaign, // TODO: Not reviewed
+    hasLocalDraftCampaign,
+    isTargetAudienceExcelFileMode,
     level1,
     level2s,
     level3s,
@@ -557,6 +604,10 @@ const LevelStep: React.FC = () => {
   }, [ensureDefaultLevelSelection, isTargetAudienceExcelFileMode]);
 
   useEffect(() => {
+    if (!isTargetAudienceExcelFileMode) {
+      setTargetAudienceExcelFileName(null);
+      return;
+    }
     const targetAudienceExcelFileUuid =
       campaignData.segment.targetAudienceExcelFileUuid;
     if (targetAudienceExcelFileUuid == null) {
@@ -574,6 +625,7 @@ const LevelStep: React.FC = () => {
     }
   }, [
     campaignData.segment.targetAudienceExcelFileUuid,
+    isTargetAudienceExcelFileMode,
     targetAudienceExcelFileName,
     t.segmentationByTargetAudienceExcelFileUploaded,
   ]);
@@ -581,6 +633,10 @@ const LevelStep: React.FC = () => {
   // Auto-select single level3s and calculate capacity/tags when level2s or level3s change
   // Stores to dedicated localStorage: level1s, level2s, level3s, metadata, tags, count
   useEffect(() => {
+    if (isSmartTargetingMode) {
+      setGradeCapacities({ A: 0, B: 0, C: 0 });
+      return;
+    }
     if (!audienceSpec || !level1 || level2s.length === 0) {
       setGradeCapacities({ A: 0, B: 0, C: 0 });
       return;
@@ -606,7 +662,6 @@ const LevelStep: React.FC = () => {
     }
 
     // Collect tags and metadata from audienceSpec; calculate capacity from CSV
-    let csvCapacity = 0;
     const nextGradeCapacities: Record<AudienceGrade, number> = {
       A: 0,
       B: 0,
@@ -641,7 +696,6 @@ const LevelStep: React.FC = () => {
         // Capacity and grade capacities from CSV
         const stat = getLayer3Stat(l3);
         if (stat) {
-          csvCapacity += calcTotalCapacity(stat, platform);
           (['A', 'B', 'C'] as AudienceGrade[]).forEach(grade => {
             nextGradeCapacities[grade] += calcGradeCapacity(
               stat,
@@ -654,6 +708,10 @@ const LevelStep: React.FC = () => {
     });
 
     setGradeCapacities(nextGradeCapacities);
+    const selectedGradeCapacity = audienceGrades.reduce(
+      (sum, grade) => sum + nextGradeCapacities[grade],
+      0
+    );
 
     // Create level selection state
     const selectionState: LevelSelectionState = {
@@ -663,9 +721,13 @@ const LevelStep: React.FC = () => {
       level3s: l3Array,
       targetAudienceExcelFileUuid:
         campaignData.segment.targetAudienceExcelFileUuid ?? null,
+      audienceTargetingMethod,
+      selectedTagIds: campaignData.segment.selectedTagIds ?? [],
+      smartTargetingSelectedRawCapacity:
+        campaignData.segment.smartTargetingSelectedRawCapacity ?? 0,
       metadata: metadata,
       tags: Array.from(tags),
-      count: csvCapacity,
+      count: selectedGradeCapacity,
       lastUpdated: new Date().toISOString(),
     };
 
@@ -673,7 +735,10 @@ const LevelStep: React.FC = () => {
     saveLevelSelection(selectionState);
 
     // Block when level3s are selected but CSV has no match (capacity = 0) or capacity < 500
-    const capacityTooLow = l3Array.length > 0 && csvCapacity < 500;
+    const capacityTooLow =
+      !isTargetAudienceExcelFileMode &&
+      l3Array.length > 0 &&
+      selectedGradeCapacity < 500;
 
     updateLevel({
       level1: level1,
@@ -682,7 +747,7 @@ const LevelStep: React.FC = () => {
       targetAudienceExcelFileUuid:
         campaignData.segment.targetAudienceExcelFileUuid ?? null,
       tags: Array.from(tags),
-      capacity: csvCapacity,
+      capacity: selectedGradeCapacity,
       capacityTooLow: capacityTooLow,
       jobCategory,
       job,
@@ -693,10 +758,16 @@ const LevelStep: React.FC = () => {
     level2s,
     level3s,
     platform,
+    audienceTargetingMethod,
+    campaignData.segment.selectedTagIds,
+    campaignData.segment.smartTargetingSelectedRawCapacity,
     campaignData.segment.targetAudienceExcelFileUuid,
     campaignTitle,
     jobCategory,
     job,
+    audienceGrades,
+    isTargetAudienceExcelFileMode,
+    isSmartTargetingMode,
     updateLevel,
   ]);
 
@@ -706,31 +777,159 @@ const LevelStep: React.FC = () => {
   };
 
   const handleBundleChange = (value: number | null) => {
-    updateLevel({ bundleId: value });
+    targetingModeSequenceRef.current += 1;
+    const bundleChanged = value !== campaignData.segment.bundleId;
+    updateLevel({
+      bundleId: value,
+      ...(bundleChanged
+        ? {
+            selectedTagIds: [],
+            smartTargetingSelectedRawCapacity: 0,
+            smartTargetingSelectionDirty: false,
+          }
+        : {}),
+    });
   };
 
   const handlePhaseChange = (value: string) => {
-    updateLevel({ phase: value });
+    if (value === 'test' || value === 'execution') {
+      updateLevel({ phase: value as CampaignPhase });
+    }
+  };
+
+  const persistTargetingSelection = (
+    method: AudienceTargetingMethod,
+    selectedTagIds = campaignData.segment.selectedTagIds ?? [],
+    selectedRawCapacity = campaignData.segment
+      .smartTargetingSelectedRawCapacity ?? 0,
+    targetAudienceExcelFileUuid = campaignData.segment
+      .targetAudienceExcelFileUuid ?? null,
+    title = campaignTitle
+  ) => {
+    const savedSelection = loadLevelSelection() ?? createEmptyLevelSelection();
+    saveLevelSelection({
+      ...savedSelection,
+      campaignTitle: title,
+      targetAudienceExcelFileUuid,
+      audienceTargetingMethod: method,
+      selectedTagIds,
+      smartTargetingSelectedRawCapacity: selectedRawCapacity,
+      count:
+        method === 'smart_targeting'
+          ? selectedRawCapacity
+          : (campaignData.segment.capacity ?? savedSelection.count),
+    });
   };
 
   const handleCampaignTitleChange = (value: string) => {
     setCampaignTitle(value);
     updateLevel({ campaignTitle: value });
+    persistTargetingSelection(
+      audienceTargetingMethod,
+      undefined,
+      undefined,
+      undefined,
+      value
+    );
+  };
+
+  const handleSmartTargetingSelectionChange = (
+    tagIds: number[],
+    selectedRawCapacity: number,
+    source: 'local' | 'server'
+  ) => {
+    updateLevel({
+      audienceTargetingMethod: 'smart_targeting',
+      selectedTagIds: tagIds,
+      smartTargetingSelectedRawCapacity: selectedRawCapacity,
+      smartTargetingSelectionDirty: source === 'local',
+      capacity: undefined,
+      capacityTooLow: tagIds.length > 0 && selectedRawCapacity < 500,
+    });
+    persistTargetingSelection('smart_targeting', tagIds, selectedRawCapacity);
   };
 
   const handleSegmentationModeChange = (
-    mode: 'target-audience-excel-file' | 'levels'
+    mode: 'target-audience-excel-file' | 'levels' | 'smart-targeting'
   ) => {
+    const modeSequence = targetingModeSequenceRef.current + 1;
+    targetingModeSequenceRef.current = modeSequence;
+
     if (mode === 'levels') {
       setTargetAudienceExcelFileName(null);
-      updateLevel({ targetAudienceExcelFileUuid: null });
+      updateLevel({
+        audienceTargetingMethod: 'standard',
+      });
+      persistTargetingSelection('standard');
+      return;
+    }
+
+    if (mode === 'smart-targeting') {
+      setTargetAudienceExcelFileName(null);
+      updateLevel({
+        audienceTargetingMethod: 'smart_targeting',
+        capacity: undefined,
+        capacityTooLow: false,
+      });
+      persistTargetingSelection('smart_targeting');
+
+      const current = campaignDataRef.current;
+      const canRestorePersistedSelection =
+        Boolean(current.uuid) &&
+        persistedCampaignContext?.uuid === current.uuid &&
+        persistedCampaignContext.bundleId ===
+          (current.segment.bundleId ?? null) &&
+        current.segment.smartTargetingSelectionDirty !== true;
+
+      if (canRestorePersistedSelection) {
+        void apiService
+          .getCampaignSmartTargetingSelection(current.uuid)
+          .then(response => {
+            const latest = campaignDataRef.current;
+            if (
+              targetingModeSequenceRef.current !== modeSequence ||
+              latest.uuid !== current.uuid ||
+              latest.segment.bundleId !== current.segment.bundleId ||
+              !response.success ||
+              !response.data
+            ) {
+              return;
+            }
+
+            const tagIds = Array.from(
+              new Set(
+                (response.data.selected_tag_ids || []).filter(
+                  tagId => Number.isInteger(tagId) && tagId > 0
+                )
+              )
+            );
+            const selectedRawCapacity =
+              typeof response.data.summary?.selected_raw_capacity ===
+                'number' &&
+              Number.isFinite(response.data.summary.selected_raw_capacity)
+                ? Math.max(0, response.data.summary.selected_raw_capacity)
+                : 0;
+            handleSmartTargetingSelectionChange(
+              tagIds,
+              selectedRawCapacity,
+              'server'
+            );
+          });
+      }
       return;
     }
 
     updateLevel({
+      audienceTargetingMethod: 'excel',
       targetAudienceExcelFileUuid:
         campaignData.segment.targetAudienceExcelFileUuid ?? '',
     });
+    persistTargetingSelection(
+      'excel',
+      undefined,
+      undefined,
+      campaignData.segment.targetAudienceExcelFileUuid ?? ''
+    );
     ensureDefaultLevelSelection();
   };
 
@@ -740,24 +939,50 @@ const LevelStep: React.FC = () => {
       return;
     }
 
+    const uploadSequence = excelUploadSequenceRef.current + 1;
+    excelUploadSequenceRef.current = uploadSequence;
     if (campaignData.segment.targetAudienceExcelFileUuid == null) {
-      updateLevel({ targetAudienceExcelFileUuid: '' });
+      updateLevel({
+        audienceTargetingMethod: 'excel',
+        targetAudienceExcelFileUuid: '',
+      });
+      persistTargetingSelection('excel', undefined, undefined, '');
     }
     setTargetAudienceExcelFileName(file.name);
     ensureDefaultLevelSelection();
 
     const uuid = await uploadMedia(file);
+    if (
+      excelUploadSequenceRef.current !== uploadSequence ||
+      resolveAudienceTargetingMethod(campaignDataRef.current.segment) !==
+        'excel'
+    ) {
+      return;
+    }
     if (!uuid) {
-      updateLevel({ targetAudienceExcelFileUuid: '' });
+      updateLevel({
+        audienceTargetingMethod: 'excel',
+        targetAudienceExcelFileUuid: '',
+      });
+      persistTargetingSelection('excel', undefined, undefined, '');
       return;
     }
 
-    updateLevel({ targetAudienceExcelFileUuid: uuid });
+    updateLevel({
+      audienceTargetingMethod: 'excel',
+      targetAudienceExcelFileUuid: uuid,
+    });
+    persistTargetingSelection('excel', undefined, undefined, uuid);
   };
 
   const handleTargetAudienceExcelFileClear = () => {
+    excelUploadSequenceRef.current += 1;
     setTargetAudienceExcelFileName(null);
-    updateLevel({ targetAudienceExcelFileUuid: '' });
+    updateLevel({
+      audienceTargetingMethod: 'excel',
+      targetAudienceExcelFileUuid: '',
+    });
+    persistTargetingSelection('excel', undefined, undefined, '');
   };
 
   const handleLevel1Change = (value: string) => {
@@ -826,6 +1051,8 @@ const LevelStep: React.FC = () => {
   };
 
   const handlePlatformChange = (value: CampaignPlatform) => {
+    targetingModeSequenceRef.current += 1;
+    excelUploadSequenceRef.current += 1;
     setPlatform(value);
     setLevel1('');
     setLevel2s([]);
@@ -835,24 +1062,35 @@ const LevelStep: React.FC = () => {
     setTargetAudienceExcelFileName(null);
     clearLevelSelection();
     // Platform-specific settings selection from content step must be reset on platform switch.
-    updateContent({ platformSettingsId: null });
+    updateContent({
+      lineNumber: '',
+      platformSettingsId: null,
+      mediaUuid: null,
+    });
     updateLevel({
       platform: value,
+      audienceTargetingMethod: 'standard',
       level1: '',
       level2s: [],
       level3s: [],
       targetAudienceExcelFileUuid: null,
       tags: [],
+      selectedTagIds: [],
+      smartTargetingSelectedRawCapacity: 0,
+      smartTargetingSelectionDirty: false,
       capacity: 0,
       capacityTooLow: false,
       audienceGrades: [],
+      sex: '',
+      city: [],
     });
   };
 
   const handleReset = () => {
     if (!hasLocalDraftCampaign()) return;
+    targetingModeSequenceRef.current += 1;
+    excelUploadSequenceRef.current += 1;
 
-    // TODO: Not reviewed
     // Keep form empty after reset instead of re-hydrating from last initiated campaign.
     lastInitiatedFetchedRef.current = true;
     lastInitiatedInFlightRef.current = false;
@@ -870,25 +1108,7 @@ const LevelStep: React.FC = () => {
     setJobErrors({});
     clearLevelSelection();
 
-    updateLevel({
-      campaignTitle: '',
-      platform: 'sms',
-      level1: '',
-      level2s: [],
-      level3s: [],
-      targetAudienceExcelFileUuid: null,
-      tags: [],
-      capacity: 0,
-      capacityTooLow: false,
-      audienceGrades: [],
-      jobCategory: '',
-      job: '',
-      bundleId: null,
-      phase: 'execution',
-    });
-
-    localStorage.removeItem('campaign_creation_data');
-    localStorage.removeItem('campaign_creation_step');
+    resetCampaign();
   };
 
   const level1Options = getLevel1Options(audienceSpec || null);
@@ -987,10 +1207,21 @@ const LevelStep: React.FC = () => {
                 <input
                   type='radio'
                   name='segmentationMode'
-                  checked={!isTargetAudienceExcelFileMode}
+                  checked={audienceTargetingMethod === 'standard'}
                   onChange={() => handleSegmentationModeChange('levels')}
                 />
                 <span>{t.segmentationByLevels}</span>
+              </label>
+              <label className='inline-flex items-center gap-2 text-sm text-gray-700'>
+                <input
+                  type='radio'
+                  name='segmentationMode'
+                  checked={isSmartTargetingMode}
+                  onChange={() =>
+                    handleSegmentationModeChange('smart-targeting')
+                  }
+                />
+                <span>{t.segmentationBySmartTargeting}</span>
               </label>
               <label className='inline-flex items-center gap-2 text-sm text-gray-700'>
                 <input
@@ -1007,7 +1238,32 @@ const LevelStep: React.FC = () => {
           </div>
         </div>
 
-        {isTargetAudienceExcelFileMode ? (
+        {isSmartTargetingMode ? (
+          <div className='md:col-span-2'>
+            <SmartTargetingTagsTable
+              bundleId={campaignData.segment.bundleId}
+              campaignUuid={campaignData.uuid || undefined}
+              selectedTagIds={campaignData.segment.selectedTagIds || []}
+              selectedRawCapacity={
+                campaignData.segment.smartTargetingSelectedRawCapacity || 0
+              }
+              useCampaignEndpoints={canUseCampaignSmartTargetingApis}
+              selectionIsDirty={
+                campaignData.segment.smartTargetingSelectionDirty === true
+              }
+              onSelectionChange={handleSmartTargetingSelectionChange}
+              copy={t.smartTargeting}
+            />
+            {(campaignData.segment.selectedTagIds?.length ?? 0) === 0 ? (
+              <p className='mt-2 text-sm text-red-600'>
+                {t.smartTargeting.validationRequired}
+              </p>
+            ) : (campaignData.segment.smartTargetingSelectedRawCapacity ?? 0) <
+              500 ? (
+              <p className='mt-2 text-sm text-red-600'>{t.capacityTooLow}</p>
+            ) : null}
+          </div>
+        ) : isTargetAudienceExcelFileMode ? (
           <div className='md:col-span-2'>
             <TargetAudienceExcelFileUploadCard
               label={t.segmentationByTargetAudienceExcelFileTitle}

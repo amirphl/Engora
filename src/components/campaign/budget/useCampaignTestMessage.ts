@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useToast } from '../../../hooks/useToast';
 import { apiService } from '../../../services/api';
 import { CampaignData } from '../../../types/campaign';
@@ -52,6 +52,7 @@ export const useCampaignTestMessage = ({
   const { showError, showSuccess } = useToast();
   const [isSending, setIsSending] = useState(false);
   const inFlightRef = useRef(false);
+  const accessTokenRef = useRef(accessToken);
   const normalizedLanguage: 'en' | 'fa' = language === 'fa' ? 'fa' : 'en';
   const copy = budgetI18n[normalizedLanguage];
 
@@ -64,6 +65,12 @@ export const useCampaignTestMessage = ({
     [checks]
   );
   const isReady = validationErrorCode === null;
+
+  useEffect(() => {
+    accessTokenRef.current = accessToken;
+    inFlightRef.current = false;
+    setIsSending(false);
+  }, [accessToken]);
 
   const sendTestMessage = useCallback(async () => {
     if (inFlightRef.current) return;
@@ -88,6 +95,7 @@ export const useCampaignTestMessage = ({
     setIsSending(true);
 
     try {
+      const requestToken = accessToken;
       apiService.setAccessToken(accessToken);
       const response = await apiService.sendCampaignTestMessage(
         campaignData.uuid,
@@ -95,6 +103,7 @@ export const useCampaignTestMessage = ({
           target_phone_number: `+98${normalizedTargetPhoneNumber}`,
         }
       );
+      if (accessTokenRef.current !== requestToken) return;
 
       if (response.success) {
         showSuccess(copy.testMessageSuccess);

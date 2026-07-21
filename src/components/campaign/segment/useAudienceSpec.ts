@@ -10,7 +10,12 @@ export const useAudienceSpec = (platform: string = 'sms') => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!accessToken) return;
+    if (!accessToken) {
+      setSpec(null);
+      setLoading(false);
+      setError(null);
+      return;
+    }
     const cacheKey = platform || 'sms';
     let canceled = false;
     setLoading(true);
@@ -21,17 +26,18 @@ export const useAudienceSpec = (platform: string = 'sms') => {
       try {
         apiService.setAccessToken(accessToken);
         const res = await apiService.listAudienceSpec(cacheKey);
-        const nextSpec =
-          (res as any)?.data?.spec ?? (res as any)?.data?.data?.spec;
+        const nextSpec = res.data?.spec;
         if (!res.success || !nextSpec) {
           throw new Error(res.message || 'Failed to load audience spec');
         }
         if (canceled) return;
         setSpec(nextSpec as AudienceSpec);
         setError(null);
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (canceled) return;
-        setError(e?.message || 'Failed to load audience spec');
+        setError(
+          e instanceof Error ? e.message : 'Failed to load audience spec'
+        );
       } finally {
         if (canceled) return;
         setLoading(false);

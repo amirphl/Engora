@@ -112,6 +112,7 @@ const LinkInsertionCard: React.FC<LinkInsertionCardProps> = ({
                 ref={inputRef}
                 type='text'
                 dir='ltr'
+                maxLength={maxLinkCharacters}
                 placeholder={linkPlaceholder}
                 value={link || ''}
                 onChange={e => {
