@@ -1,6 +1,14 @@
 // Campaign Types and Interfaces
 
 export type AudienceGrade = 'A' | 'B' | 'C';
+export type AudienceTargetingMethod = 'standard' | 'smart_targeting' | 'excel';
+export type CampaignPhase = 'test' | 'execution';
+export type SmartTargetingSortBy =
+  | 'tag_capacity'
+  | 'bundle_persona_fit_score'
+  | 'test_phase_avg_ctr'
+  | 'overall_avg_ctr';
+export type SmartTargetingSortDirection = 'asc' | 'desc';
 
 export interface CampaignSegment {
   campaignTitle: string;
@@ -10,13 +18,19 @@ export interface CampaignSegment {
   targetAudienceExcelFileUuid?: string | null; // Excel segmentation upload UUID
   platform: CampaignPlatform;
   tags?: string[]; // Union of tags from selected level3s
+  audienceTargetingMethod?: AudienceTargetingMethod;
+  selectedTagIds?: number[]; // Campaign-level Smart Targeting tag IDs
+  smartTargetingSelectedRawCapacity?: number;
+  smartTargetingSelectionDirty?: boolean;
   capacityTooLow?: boolean;
   capacity?: number; // Total audience capacity (calculated from CSV)
   audienceGrades?: AudienceGrade[]; // Selected audience quality grades
+  sex?: string;
+  city?: string[];
   jobCategory?: string;
   job?: string;
   bundleId?: number | null;
-  phase?: string;
+  phase?: CampaignPhase;
 }
 
 export interface CustomFilter {
@@ -69,6 +83,10 @@ export interface CreateCampaignPayload {
   level3s?: string[]; // Level 3 selections (multiple)
   target_audience_excel_file_uuid?: string | null;
   tags?: string[]; // Union of tags from selected level3s
+  audience_targeting_method?: AudienceTargetingMethod;
+  selected_tag_ids?: number[];
+  sex?: string;
+  city?: string[];
   adlink?: string;
   content?: string;
   scheduleat?: string;
@@ -81,14 +99,22 @@ export interface CreateCampaignPayload {
   platform_settings_id?: number | null;
   media_uuid?: string | null;
   bundle_id?: number | null;
-  phase?: string;
+  phase?: CampaignPhase;
   audience_grades?: AudienceGrade[];
 }
 
 // API response interface matching Go backend structure
 export interface CreateSMSCampaignResponse {
   message: string;
-  id?: number;
+  id: number;
+  uuid: string;
+  status: string;
+  created_at: string;
+}
+
+export interface CloneCampaignResponse {
+  message: string;
+  id: number;
   uuid: string;
   status: string;
   created_at: string;
@@ -159,6 +185,10 @@ export interface UpdateSMSCampaignRequest {
   level3s?: string[]; // Level 3 selections (multiple)
   target_audience_excel_file_uuid?: string | null;
   tags?: string[]; // Union of tags from selected level3s
+  audience_targeting_method?: AudienceTargetingMethod;
+  selected_tag_ids?: number[];
+  sex?: string;
+  city?: string[];
   adlink?: string;
   content?: string;
   scheduleat?: string;
@@ -172,7 +202,7 @@ export interface UpdateSMSCampaignRequest {
   platform_settings_id?: number | null;
   media_uuid?: string | null;
   bundle_id?: number | null;
-  phase?: string;
+  phase?: CampaignPhase;
   audience_grades?: AudienceGrade[];
 }
 
@@ -269,6 +299,7 @@ export interface GetCampaignResponse {
   level3s?: string[];
   target_audience_excel_file_uuid?: string | null;
   tags?: string[];
+  audience_targeting_method?: AudienceTargetingMethod | string;
   sex?: string;
   city?: string[];
   adlink?: string;
@@ -294,7 +325,7 @@ export interface GetCampaignResponse {
   audience_grades?: AudienceGrade[];
   bundle_id?: number | null;
   bundle_title?: string | null;
-  phase?: string | null;
+  phase?: CampaignPhase | string | null;
 }
 
 export interface PaginationInfo {
@@ -302,6 +333,58 @@ export interface PaginationInfo {
   limit: number;
   total_items: number;
   total_pages: number;
+}
+
+export interface SmartTargetingTagItem {
+  tag_id: number;
+  tag_display_title?: string | null;
+  tag_capacity?: number | null;
+  bundle_persona_fit_score?: number | null;
+  evaluation_run_id?: number | null;
+  fit_level?: string | null;
+  relation_type?: string | null;
+  test_phase_avg_ctr?: number | null;
+  overall_avg_ctr?: number | null;
+  selected: boolean;
+}
+
+export interface SmartTargetingSelectionSummary {
+  selected_tag_count: number;
+  selected_raw_capacity: number;
+}
+
+export interface ListSmartTargetingTagsParams {
+  page: number;
+  page_size: number;
+  search?: string;
+  sort_by?: SmartTargetingSortBy;
+  sort_direction?: SmartTargetingSortDirection;
+}
+
+export interface ListSmartTargetingTagsResponse {
+  items: SmartTargetingTagItem[];
+  pagination: PaginationInfo;
+  selected_tag_ids: number[];
+  summary: SmartTargetingSelectionSummary;
+  evaluation_available: boolean;
+  effective_sort_by?: SmartTargetingSortBy | '';
+  effective_sort_direction?: SmartTargetingSortDirection | '';
+}
+
+export interface ReplaceSmartTargetingSelectionRequest {
+  tag_ids: number[];
+}
+
+export interface AutoSelectSmartTargetingTagsRequest {
+  count: number;
+  search?: string;
+  sort_by?: SmartTargetingSortBy;
+  sort_direction?: SmartTargetingSortDirection;
+}
+
+export interface SmartTargetingSelectionResponse {
+  selected_tag_ids: number[];
+  summary: SmartTargetingSelectionSummary;
 }
 
 export interface ListSMSCampaignsResponse {
