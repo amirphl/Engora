@@ -39,6 +39,9 @@ export interface EnvironmentConfig {
       audienceSpec: string;
       lastInitiated: string;
       clone: string;
+      smartTargetingTags: string;
+      smartTargetingSelection: string;
+      smartTargetingAutoSelect: string;
     };
     bundles: {
       list: string;
@@ -48,6 +51,7 @@ export interface EnvironmentConfig {
       requestTagEvaluation: string;
       tagEvaluationStatus: string;
       tagScores: string;
+      smartTargetingTags: string;
     };
     wallet: {
       balance: string;
@@ -141,6 +145,10 @@ const localConfig: EnvironmentConfig = {
       audienceSpec: '/campaigns/audience-spec',
       lastInitiated: '/campaigns/initiated/last',
       clone: '/campaigns/:uuid/clone',
+      smartTargetingTags: '/campaigns/:uuid/smart-targeting/tags',
+      smartTargetingSelection: '/campaigns/:uuid/smart-targeting/selection',
+      smartTargetingAutoSelect:
+        '/campaigns/:uuid/smart-targeting/selection/auto',
     },
     bundles: {
       list: '/bundles',
@@ -150,6 +158,7 @@ const localConfig: EnvironmentConfig = {
       requestTagEvaluation: '/bundles/:id/tag-evaluations',
       tagEvaluationStatus: '/bundles/:id/tag-evaluation',
       tagScores: '/bundles/:id/tag-scores',
+      smartTargetingTags: '/bundles/:id/smart-targeting/tags',
     },
     wallet: {
       balance: '/wallet/balance',
