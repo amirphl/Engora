@@ -139,6 +139,8 @@ const FormField = forwardRef<HTMLTextAreaElement, FormFieldProps>(
               disabled={disabled}
               min={validation?.min}
               max={validation?.max}
+              maxLength={type === 'text' ? validation?.max : undefined}
+              pattern={validation?.pattern}
               step={validation?.step}
               className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 ${error ? 'border-red-300' : 'border-gray-300'} ${inputClassName}`}
             />
