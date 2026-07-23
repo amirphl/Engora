@@ -5,17 +5,18 @@ import { PlatformKey, PlatformSettingsItem } from '../types/platformSettings';
 
 type Option = { value: string; label: string };
 
-let platformSettingsCache: PlatformSettingsItem[] | null = null;
-let platformSettingsFetchInFlight: Promise<PlatformSettingsItem[]> | null =
-  null;
-let fetchAttempted = false;
+const platformSettingsCache = new Map<string, PlatformSettingsItem[]>();
+const platformSettingsFetchInFlight = new Map<
+  string,
+  Promise<PlatformSettingsItem[]>
+>();
 
 export const usePlatformSettingsList = (
   accessToken: string | null,
   platform: PlatformKey
 ) => {
   const [items, setItems] = useState<PlatformSettingsItem[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(Boolean(accessToken));
   const [error, setError] = useState<string | null>(null);
   const { showToast } = useToast();
   const showToastRef = useRef(showToast);
@@ -25,54 +26,49 @@ export const usePlatformSettingsList = (
   }, [showToast]);
 
   useEffect(() => {
-    if (!accessToken) return;
+    if (!accessToken) {
+      setItems([]);
+      setIsLoading(false);
+      setError(null);
+      return;
+    }
 
     apiService.setAccessToken(accessToken);
+    let isActive = true;
 
-    if (platformSettingsCache) {
-      setItems(platformSettingsCache);
-      return;
-    }
-
-    if (fetchAttempted && !platformSettingsFetchInFlight) {
-      setError('Failed to load platform settings');
-      return;
-    }
-
-    if (platformSettingsFetchInFlight) {
-      setIsLoading(true);
+    const cached = platformSettingsCache.get(accessToken);
+    if (cached) {
+      setItems(cached);
+      setIsLoading(false);
       setError(null);
-      platformSettingsFetchInFlight
-        .then(data => {
-          setItems(data);
-          setIsLoading(false);
-        })
-        .catch(() => {
-          setError('Failed to load platform settings');
-          setIsLoading(false);
-        });
-      return;
+      return () => {
+        isActive = false;
+      };
     }
 
-    if (fetchAttempted) return;
-
-    fetchAttempted = true;
     setIsLoading(true);
     setError(null);
-    platformSettingsFetchInFlight = (async () => {
-      const res = await apiService.listPlatformSettings();
-      if (!res.success || !res.data) {
-        throw new Error(res.message || 'Failed to load platform settings');
-      }
-      return res.data.items || [];
-    })();
+    let request = platformSettingsFetchInFlight.get(accessToken);
+    if (!request) {
+      request = (async () => {
+        const res = await apiService.listPlatformSettings();
+        if (!res.success || !res.data) {
+          throw new Error(res.message || 'Failed to load platform settings');
+        }
+        return res.data.items || [];
+      })();
+      platformSettingsFetchInFlight.set(accessToken, request);
+    }
 
-    platformSettingsFetchInFlight
+    request
       .then(data => {
-        platformSettingsCache = data;
+        platformSettingsCache.set(accessToken, data);
+        if (!isActive) return;
         setItems(data);
+        setError(null);
       })
       .catch((err: unknown) => {
+        if (!isActive) return;
         const message =
           err instanceof Error
             ? err.message
@@ -81,9 +77,16 @@ export const usePlatformSettingsList = (
         showToastRef.current('error', message);
       })
       .finally(() => {
+        if (platformSettingsFetchInFlight.get(accessToken) === request) {
+          platformSettingsFetchInFlight.delete(accessToken);
+        }
+        if (!isActive) return;
         setIsLoading(false);
-        platformSettingsFetchInFlight = null;
       });
+
+    return () => {
+      isActive = false;
+    };
   }, [accessToken]);
 
   const filteredItems = useMemo(() => {
