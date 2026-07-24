@@ -1,85 +1,91 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { apiService } from '../../../services/api';
 
 type BundleOption = { value: string; label: string };
 
-let bundlesCache: Array<BundleOption> | null = null;
-let bundlesFetchInFlight: Promise<Array<BundleOption>> | null = null;
-let bundlesCacheToken: string | null = null;
+const bundlesCache = new Map<string, BundleOption[]>();
+const bundlesFetchInFlight = new Map<string, Promise<BundleOption[]>>();
+let bundlesCacheVersion = 0;
 
 export const resetBundlesCache = () => {
-  bundlesCache = null;
-  bundlesFetchInFlight = null;
-  bundlesCacheToken = null;
+  bundlesCacheVersion += 1;
+  bundlesCache.clear();
+  bundlesFetchInFlight.clear();
 };
 
 export const useBundles = (accessToken: string | null) => {
-  const [bundleOptions, setBundleOptions] = useState<Array<BundleOption>>(
-    bundlesCache ?? []
-  );
-  const [isLoading, setIsLoading] = useState(false);
+  const [bundleOptions, setBundleOptions] = useState<BundleOption[]>([]);
+  const [isLoading, setIsLoading] = useState(Boolean(accessToken));
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!accessToken) return;
-    apiService.setAccessToken(accessToken);
-
-    // Invalidate cache when a different token is used (e.g. after re-login)
-    if (bundlesCacheToken !== null && bundlesCacheToken !== accessToken) {
-      bundlesCache = null;
-      bundlesFetchInFlight = null;
-      bundlesCacheToken = null;
-    }
-
-    if (bundlesCache) {
-      setBundleOptions(bundlesCache);
-      return;
-    }
-
-    if (bundlesFetchInFlight) {
-      setIsLoading(true);
+    if (!accessToken) {
+      setBundleOptions([]);
+      setIsLoading(false);
       setError(null);
-      bundlesFetchInFlight
-        .then(opts => {
-          setBundleOptions(opts);
-          setIsLoading(false);
-        })
-        .catch(err => {
-          setError(err.message || 'FETCH_FAILED');
-          setIsLoading(false);
-        });
       return;
+    }
+
+    apiService.setAccessToken(accessToken);
+    let isActive = true;
+    const cacheVersion = bundlesCacheVersion;
+
+    const cached = bundlesCache.get(accessToken);
+    if (cached) {
+      setBundleOptions(cached);
+      setIsLoading(false);
+      setError(null);
+      return () => {
+        isActive = false;
+      };
     }
 
     setIsLoading(true);
     setError(null);
+    let request = bundlesFetchInFlight.get(accessToken);
+    if (!request) {
+      request = (async () => {
+        const response = await apiService.listBundles({
+          page: 1,
+          limit: 500,
+        });
+        if (!response.success || !response.data) {
+          throw new Error(
+            response.error?.code || response.message || 'FETCH_FAILED'
+          );
+        }
+        return (response.data.items || [])
+          .map(item => ({
+            value: String(item.id || ''),
+            label: item.title || String(item.id || ''),
+          }))
+          .filter(option => option.value);
+      })();
+      bundlesFetchInFlight.set(accessToken, request);
+    }
 
-    bundlesFetchInFlight = (async () => {
-      const res = await apiService.listBundles({ page: 1, limit: 500 });
-      if (!res.success || !res.data) {
-        throw new Error(res.error?.code || res.message || 'FETCH_FAILED');
-      }
-      return (res.data.items || [])
-        .map(item => ({
-          value: String(item.id || ''),
-          label: item.title || String(item.id || ''),
-        }))
-        .filter(opt => opt.value);
-    })();
-
-    bundlesFetchInFlight
-      .then(opts => {
-        bundlesCache = opts;
-        bundlesCacheToken = accessToken;
-        setBundleOptions(opts);
+    request
+      .then(options => {
+        if (cacheVersion !== bundlesCacheVersion) return;
+        bundlesCache.set(accessToken, options);
+        if (!isActive) return;
+        setBundleOptions(options);
+        setError(null);
       })
-      .catch(err => {
-        setError(err.message || 'FETCH_FAILED');
+      .catch((err: unknown) => {
+        if (!isActive) return;
+        setError(err instanceof Error ? err.message : 'FETCH_FAILED');
       })
       .finally(() => {
-        setIsLoading(false);
-        bundlesFetchInFlight = null;
+        if (bundlesFetchInFlight.get(accessToken) === request) {
+          bundlesFetchInFlight.delete(accessToken);
+        }
+        if (isActive) setIsLoading(false);
       });
+
+    return () => {
+      isActive = false;
+    };
   }, [accessToken]);
 
   return { bundleOptions, isLoading, error };
