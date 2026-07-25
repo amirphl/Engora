@@ -2,11 +2,16 @@ import React from 'react';
 import { Calendar } from 'lucide-react';
 import Card from '../../ui/Card';
 import DatePicker from 'react-multi-date-picker';
+import DateObject from 'react-date-object';
 import persian from 'react-date-object/calendars/persian';
 import persian_fa from 'react-date-object/locales/persian_fa';
 import gregorian from 'react-date-object/calendars/gregorian';
 import gregorian_en from 'react-date-object/locales/gregorian_en';
 import TimePicker from 'react-multi-date-picker/plugins/time_picker';
+import {
+  isScheduleWithinTehranWindow,
+  MIN_SCHEDULE_LEAD_TIME_MS,
+} from '../../../utils/campaignUtils';
 
 interface ScheduleCardProps {
   showDateTimePicker: boolean;
@@ -21,6 +26,7 @@ interface ScheduleCardProps {
   immediateLabel: string;
   dateTimeLabel: string;
   tooSoonError: string;
+  outsideWindowError: string;
 }
 
 const ScheduleCard: React.FC<ScheduleCardProps> = ({
@@ -36,13 +42,21 @@ const ScheduleCard: React.FC<ScheduleCardProps> = ({
   immediateLabel,
   dateTimeLabel,
   tooSoonError,
+  outsideWindowError,
 }) => {
   const nowMs = Date.now();
-  const minMs = nowMs + 20 * 60 * 1000;
+  const minMs = nowMs + MIN_SCHEDULE_LEAD_TIME_MS;
   const schedMs = scheduleAt ? new Date(scheduleAt).getTime() : NaN;
-  const isInvalid = scheduleAt
-    ? Number.isNaN(schedMs) || schedMs < minMs
-    : false;
+  const isTooSoon =
+    Boolean(scheduleAt) && (Number.isNaN(schedMs) || schedMs < minMs);
+  const isOutsideWindow =
+    (Boolean(scheduleAt) &&
+      !Number.isNaN(schedMs) &&
+      !isScheduleWithinTehranWindow(scheduleAt!)) ||
+    (!showDateTimePicker &&
+      !isScheduleWithinTehranWindow(
+        new Date(nowMs + MIN_SCHEDULE_LEAD_TIME_MS)
+      ));
 
   return (
     <Card className='h-full'>
@@ -92,13 +106,13 @@ const ScheduleCard: React.FC<ScheduleCardProps> = ({
                 locale={isEnglish ? gregorian_en : persian_fa}
                 plugins={[<TimePicker hideSeconds={true} />]}
                 value={scheduleAt ? new Date(scheduleAt) : undefined}
-                onChange={(val: any) => {
+                onChange={(val: DateObject | null) => {
                   if (!val) {
                     onScheduleChange(undefined);
                     return;
                   }
                   try {
-                    const jsDate = val.toDate ? val.toDate() : new Date(val);
+                    const jsDate = val.toDate();
                     jsDate.setSeconds(0, 0);
                     onScheduleChange(jsDate.toISOString());
                   } catch {
@@ -108,11 +122,19 @@ const ScheduleCard: React.FC<ScheduleCardProps> = ({
                 format='YYYY/MM/DD HH:mm'
                 className='w-full mt-1'
               />
-              {isInvalid && (
+              {isTooSoon && (
                 <p className='text-sm text-red-600 mt-2'>{tooSoonError}</p>
+              )}
+              {!isTooSoon && isOutsideWindow && (
+                <p className='text-sm text-red-600 mt-2'>
+                  {outsideWindowError}
+                </p>
               )}
             </div>
           </div>
+        )}
+        {!showDateTimePicker && isOutsideWindow && (
+          <p className='text-sm text-red-600'>{outsideWindowError}</p>
         )}
       </div>
     </Card>
