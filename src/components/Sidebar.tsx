@@ -97,39 +97,6 @@ const Sidebar: React.FC = () => {
       }
     }
     resetCampaign();
-    const initialCampaignData = {
-      uuid: '',
-      segment: {
-        campaignTitle: '',
-        level1: '',
-        level2s: [],
-        level3s: [],
-        targetAudienceExcelFileUuid: null,
-        platform: 'sms',
-        tags: [],
-        capacityTooLow: false,
-        capacity: undefined,
-        jobCategory: '',
-        job: '',
-      },
-      content: {
-        insertLink: false,
-        link: '',
-        text: '',
-        scheduleAt: undefined,
-        shortLinkDomain: null,
-        lineNumber: '',
-        platformSettingsId: null,
-        mediaUuid: null,
-      },
-      budget: { totalBudget: 0, estimatedMessages: undefined },
-      payment: { paymentMethod: '', termsAccepted: false },
-    };
-    localStorage.setItem(
-      'campaign_creation_data',
-      JSON.stringify(initialCampaignData)
-    );
-    localStorage.setItem('campaign_creation_step', '1');
     navigate('/campaign-creation');
   };
 
