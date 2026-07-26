@@ -1,0 +1,379 @@
+import React, { useState } from 'react';
+import '@testing-library/jest-dom';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
+import {
+  beforeEach,
+  describe,
+  expect,
+  it,
+  jest as jestGlobals,
+} from '@jest/globals';
+import type { Mocked } from 'jest-mock';
+import SmartTargetingTagsTable from './SmartTargetingTagsTable';
+import { campaignLevelI18n } from './segmentTranslations';
+import { apiService } from '../../../services/api';
+
+jestGlobals.mock('../../../services/api');
+
+jestGlobals.mock('../../../hooks/useLanguage', () => ({
+  useLanguage: () => ({ language: 'en' }),
+}));
+
+jestGlobals.mock('../../../utils/errorHandler', () => ({
+  getApiErrorMessage: (
+    _response: unknown,
+    _language: string,
+    fallback: string
+  ) => fallback,
+}));
+
+const copy = campaignLevelI18n.en.smartTargeting;
+const mockedApiService = apiService as Mocked<typeof apiService>;
+
+(
+  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
+
+const tag = (id: number, title: string, capacity: number) => ({
+  tag_id: id,
+  tag_display_title: title,
+  tag_capacity: capacity,
+  bundle_persona_fit_score: null,
+  test_phase_avg_ctr: null,
+  overall_avg_ctr: null,
+  selected: false,
+});
+
+const tags = (from: number, count: number) =>
+  Array.from({ length: count }, (_, index) => {
+    const id = from + index;
+    return tag(id, `Tag ${id}`, id);
+  });
+
+const response = (
+  items: ReturnType<typeof tag>[],
+  page = 1,
+  totalItems = items.length,
+  totalPages = 1,
+  selectedTagIds: number[] = [],
+  selectedRawCapacity = 0
+) => ({
+  success: true,
+  message: 'ok',
+  data: {
+    items,
+    pagination: {
+      page,
+      limit: 20,
+      total_items: totalItems,
+      total_pages: totalPages,
+    },
+    selected_tag_ids: selectedTagIds,
+    summary: {
+      selected_tag_count: selectedTagIds.length,
+      selected_raw_capacity: selectedRawCapacity,
+    },
+    evaluation_available: false,
+    effective_sort_by: '',
+    effective_sort_direction: '',
+  },
+});
+
+const click = async (element: HTMLElement) => {
+  // The local Testing Library setup does not wrap harness state updates.
+  // eslint-disable-next-line testing-library/no-unnecessary-act
+  await act(async () => {
+    fireEvent.click(element);
+  });
+};
+
+const change = async (element: HTMLElement, value: string) => {
+  // The local Testing Library setup does not wrap harness state updates.
+  // eslint-disable-next-line testing-library/no-unnecessary-act
+  await act(async () => {
+    fireEvent.change(element, { target: { value } });
+  });
+};
+
+const SelectionHarness: React.FC<{
+  campaignUuid?: string;
+  useCampaignEndpoints?: boolean;
+  initialTagIds?: number[];
+  selectionIsDirty?: boolean;
+}> = ({
+  campaignUuid,
+  useCampaignEndpoints = false,
+  initialTagIds = [],
+  selectionIsDirty = false,
+}) => {
+  const [selectedTagIds, setSelectedTagIds] = useState(initialTagIds);
+  const [selectedRawCapacity, setSelectedRawCapacity] = useState(0);
+
+  return (
+    <>
+      <SmartTargetingTagsTable
+        bundleId={12}
+        campaignUuid={campaignUuid}
+        useCampaignEndpoints={useCampaignEndpoints}
+        selectedTagIds={selectedTagIds}
+        selectedRawCapacity={selectedRawCapacity}
+        selectionIsDirty={selectionIsDirty}
+        onSelectionChange={(ids, capacity) => {
+          setSelectedTagIds(ids);
+          setSelectedRawCapacity(capacity);
+        }}
+        copy={copy}
+      />
+      <output data-testid='selection'>{selectedTagIds.join(',')}</output>
+    </>
+  );
+};
+
+describe('SmartTargetingTagsTable', () => {
+  beforeEach(() => {
+    jestGlobals.clearAllMocks();
+  });
+
+  it('keeps manual selections when pagination changes', async () => {
+    mockedApiService.listBundleSmartTargetingTags.mockImplementation(
+      async (_bundleId, params) =>
+        Promise.resolve(
+          params.page === 1
+            ? response([tag(1, 'First tag', 10)], 1, 2, 2)
+            : response([tag(2, 'Second tag', 20)], 2, 2, 2)
+        ) as any
+    );
+
+    render(<SelectionHarness />);
+
+    const first = await screen.findByRole('checkbox', { name: 'First tag' });
+    await click(first);
+    await click(screen.getByRole('button', { name: copy.pagination.next }));
+
+    const second = await screen.findByRole('checkbox', {
+      name: 'Second tag',
+    });
+    await click(second);
+    await click(screen.getByRole('button', { name: copy.pagination.previous }));
+
+    await waitFor(() => {
+      expect(
+        (
+          screen.getByRole('checkbox', {
+            name: 'First tag',
+          }) as HTMLInputElement
+        ).checked
+      ).toBe(true);
+    });
+    expect(screen.getByTestId('selection').textContent).toContain('1,2');
+  });
+
+  it('loads and appends the next page when the table viewport is scrolled', async () => {
+    mockedApiService.listBundleSmartTargetingTags.mockImplementation(
+      async (_bundleId, params) =>
+        Promise.resolve(
+          params.page === 1
+            ? response([tag(1, 'First tag', 10)], 1, 2, 2)
+            : response([tag(2, 'Second tag', 20)], 2, 2, 2)
+        ) as any
+    );
+
+    render(<SelectionHarness />);
+    await screen.findByRole('checkbox', { name: 'First tag' });
+
+    const viewport = screen.getByRole('region', { name: copy.title });
+    Object.defineProperties(viewport, {
+      clientHeight: { configurable: true, value: 500 },
+      scrollHeight: { configurable: true, value: 1000 },
+      scrollTop: { configurable: true, value: 400 },
+    });
+    fireEvent.scroll(viewport);
+
+    await screen.findByRole('checkbox', { name: 'Second tag' });
+    expect(screen.getByRole('checkbox', { name: 'First tag' })).toBeTruthy();
+  });
+
+  it('uses the bundle endpoint for an unsaved Smart Targeting context', async () => {
+    mockedApiService.listBundleSmartTargetingTags.mockResolvedValue(
+      response([tag(1, 'Bundle tag', 10)]) as any
+    );
+
+    render(
+      <SelectionHarness
+        campaignUuid='campaign-uuid'
+        useCampaignEndpoints={false}
+      />
+    );
+
+    await screen.findByRole('checkbox', { name: 'Bundle tag' });
+    expect(mockedApiService.listBundleSmartTargetingTags).toHaveBeenCalled();
+    expect(
+      mockedApiService.listCampaignSmartTargetingTags
+    ).not.toHaveBeenCalled();
+  });
+
+  it('hydrates an authoritative empty persisted selection for a clean edit', async () => {
+    const onSelectionChange = jestGlobals.fn();
+    mockedApiService.listCampaignSmartTargetingTags.mockResolvedValue(
+      response([tag(1, 'Persisted tag', 10)]) as any
+    );
+
+    render(
+      <SmartTargetingTagsTable
+        bundleId={12}
+        campaignUuid='campaign-uuid'
+        useCampaignEndpoints
+        selectedTagIds={[1]}
+        selectedRawCapacity={10}
+        selectionIsDirty={false}
+        onSelectionChange={onSelectionChange}
+        copy={copy}
+      />
+    );
+
+    await waitFor(() => {
+      expect(onSelectionChange).toHaveBeenCalledWith([], 0, 'server');
+    });
+  });
+
+  it('preserves an unsaved selection when the persisted response differs', async () => {
+    const onSelectionChange = jestGlobals.fn();
+    mockedApiService.listCampaignSmartTargetingTags.mockResolvedValue(
+      response([tag(1, 'Dirty tag', 10)]) as any
+    );
+
+    render(
+      <SmartTargetingTagsTable
+        bundleId={12}
+        campaignUuid='campaign-uuid'
+        useCampaignEndpoints
+        selectedTagIds={[1]}
+        selectedRawCapacity={10}
+        selectionIsDirty
+        onSelectionChange={onSelectionChange}
+        copy={copy}
+      />
+    );
+
+    const checkbox = await screen.findByRole('checkbox', { name: 'Dirty tag' });
+    expect((checkbox as HTMLInputElement).checked).toBe(true);
+    expect(onSelectionChange).not.toHaveBeenCalled();
+  });
+
+  it('uses the current search text for auto-selection before debounce completes', async () => {
+    mockedApiService.listBundleSmartTargetingTags.mockImplementation(
+      async (_bundleId, params) =>
+        Promise.resolve(
+          params.search === 'Beta'
+            ? response([tag(2, 'Beta tag', 20)])
+            : response([tag(1, 'Initial tag', 10)])
+        ) as any
+    );
+
+    render(<SelectionHarness />);
+    await screen.findByRole('checkbox', { name: 'Initial tag' });
+
+    await change(
+      screen.getByRole('searchbox', { name: copy.searchLabel }),
+      'Beta'
+    );
+    await change(
+      screen.getByRole('spinbutton', {
+        name: copy.autoSelectLabel,
+      }),
+      '1'
+    );
+    await click(screen.getByRole('button', { name: copy.autoSelectButton }));
+
+    await waitFor(() => {
+      expect(
+        mockedApiService.listBundleSmartTargetingTags
+      ).toHaveBeenCalledWith(
+        12,
+        expect.objectContaining({ search: 'Beta', page: 1 }),
+        expect.any(AbortSignal)
+      );
+    });
+    expect(screen.getByTestId('selection').textContent).toContain('2');
+  });
+
+  it('collects all required bundle pages for auto-selection', async () => {
+    mockedApiService.listBundleSmartTargetingTags.mockImplementation(
+      async (_bundleId, params) =>
+        Promise.resolve(
+          params.page === 1
+            ? response(tags(1, 100), 1, 101, 2)
+            : response(tags(101, 1), 2, 101, 2)
+        ) as any
+    );
+
+    render(<SelectionHarness />);
+    await screen.findByRole('checkbox', { name: 'Tag 1' });
+
+    await change(
+      screen.getByRole('spinbutton', { name: copy.autoSelectLabel }),
+      '101'
+    );
+    await click(screen.getByRole('button', { name: copy.autoSelectButton }));
+
+    await waitFor(() => {
+      expect(
+        mockedApiService.listBundleSmartTargetingTags
+      ).toHaveBeenCalledWith(
+        12,
+        expect.objectContaining({ page: 2, page_size: 100 }),
+        expect.any(AbortSignal)
+      );
+    });
+    expect(screen.getByTestId('selection').textContent).toContain('101');
+  });
+
+  it('uses the campaign auto-selection endpoint for a saved Smart Targeting campaign', async () => {
+    mockedApiService.listCampaignSmartTargetingTags
+      .mockResolvedValueOnce(response([tag(1, 'Persisted tag', 10)]) as any)
+      .mockResolvedValue(
+        response([tag(1, 'Persisted tag', 10)], 1, 1, 1, [1], 10) as any
+      );
+    mockedApiService.autoSelectCampaignSmartTargetingTags.mockResolvedValue({
+      success: true,
+      message: 'ok',
+      data: {
+        selected_tag_ids: [1],
+        summary: {
+          selected_tag_count: 1,
+          selected_raw_capacity: 10,
+        },
+      },
+    } as any);
+
+    render(
+      <SelectionHarness campaignUuid='campaign-uuid' useCampaignEndpoints />
+    );
+    await screen.findByRole('checkbox', { name: 'Persisted tag' });
+
+    await change(
+      screen.getByRole('spinbutton', { name: copy.autoSelectLabel }),
+      '1'
+    );
+    await click(screen.getByRole('button', { name: copy.autoSelectButton }));
+
+    await waitFor(() => {
+      expect(
+        mockedApiService.autoSelectCampaignSmartTargetingTags
+      ).toHaveBeenCalledWith(
+        'campaign-uuid',
+        expect.objectContaining({ count: 1, search: '' }),
+        expect.any(AbortSignal)
+      );
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('selection').textContent).toContain('1');
+    });
+  });
+});
