@@ -18,6 +18,8 @@ const BudgetSelector: React.FC<BudgetSelectorProps> = ({
 }) => {
   const { language } = useLanguage();
   const t = budgetI18n[language as keyof typeof budgetI18n] || budgetI18n.en;
+  const balanceErrorMessage =
+    t.balanceError || 'Failed to check wallet balance';
   const { showToast } = useToast();
 
   const [balance, setBalance] = useState<number | null>(null);
@@ -30,31 +32,44 @@ const BudgetSelector: React.FC<BudgetSelectorProps> = ({
 
   useEffect(() => {
     let cancelled = false;
+    if (!accessToken) {
+      setBalance(null);
+      setError(null);
+      return;
+    }
+
     const fetchBalance = async () => {
       setError(null);
       try {
-        if (accessToken) {
-          apiService.setAccessToken(accessToken);
-        }
+        apiService.setAccessToken(accessToken);
         const resp = await apiService.getWalletBalance();
         if (cancelled) {
           return;
         }
 
         if (resp.success && resp.data) {
-          const freeBalance = Number((resp.data as any).free ?? 0);
-          const creditBalance = Number((resp.data as any).credit ?? 0);
-          setBalance(freeBalance + creditBalance);
+          const freeBalance = resp.data.free;
+          const creditBalance = resp.data.credit ?? 0;
+          const availableBalance = freeBalance + creditBalance;
+          if (
+            typeof freeBalance !== 'number' ||
+            typeof creditBalance !== 'number' ||
+            !Number.isFinite(availableBalance) ||
+            availableBalance < 0
+          ) {
+            setBalance(null);
+            setError(balanceErrorMessage);
+            showToast('error', balanceErrorMessage);
+            return;
+          }
+          setBalance(availableBalance);
         } else {
-          const msg =
-            (t as any).balanceError || 'Failed to check wallet balance';
-          setError(msg);
-          showToast('error', msg);
+          setError(balanceErrorMessage);
+          showToast('error', balanceErrorMessage);
         }
-      } catch (e) {
-        const msg = (t as any).balanceError || 'Failed to check wallet balance';
-        setError(msg);
-        showToast('error', msg);
+      } catch {
+        setError(balanceErrorMessage);
+        showToast('error', balanceErrorMessage);
       }
     };
 
@@ -62,9 +77,7 @@ const BudgetSelector: React.FC<BudgetSelectorProps> = ({
     return () => {
       cancelled = true;
     };
-    // Run on mount; in StrictMode the effect runs twice, cleanup cancels the first.
-    // eslint-disable-next-line
-  }, []);
+  }, [accessToken, balanceErrorMessage, showToast]);
 
   const availableMax = useMemo(() => {
     if (balance === null) return 0;
@@ -87,9 +100,12 @@ const BudgetSelector: React.FC<BudgetSelectorProps> = ({
   }
 
   const propagateChange = (nextPercent: number) => {
-    if (nextPercent <= 0) return;
+    if (nextPercent <= 0) {
+      onChange?.(0, 0);
+      return;
+    }
     const nextAmount = computeAmount(nextPercent);
-    if (onChange) onChange(nextPercent, nextAmount);
+    onChange?.(nextPercent, nextAmount);
   };
 
   const formatNumber = (n: number | null) => {
