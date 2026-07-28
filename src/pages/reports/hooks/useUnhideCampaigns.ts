@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { apiService } from '../../../services/api';
 import { useAuth } from '../../../hooks/useAuth';
 import { useLanguage } from '../../../hooks/useLanguage';
@@ -19,9 +19,11 @@ export const useUnhideCampaigns = ({
   const { language } = useLanguage();
   const { showError, showSuccess } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
 
   const unhideCampaigns = useCallback(
     async (campaignIds: number[]) => {
+      if (isSubmittingRef.current) return false;
       if (campaignIds.length === 0) {
         showError(copy.bulkUnhide.errors.emptySelection);
         return false;
@@ -32,6 +34,7 @@ export const useUnhideCampaigns = ({
         return false;
       }
 
+      isSubmittingRef.current = true;
       setIsSubmitting(true);
 
       try {
@@ -41,7 +44,7 @@ export const useUnhideCampaigns = ({
         });
 
         if (!response.success) {
-          const errorCode = (response as { error_code?: string }).error_code;
+          const errorCode = response.error?.code;
           if (errorCode === 'CAMPAIGN_NOT_FOUND') {
             showError(copy.bulkUnhide.errors.notFound);
             return false;
@@ -67,6 +70,7 @@ export const useUnhideCampaigns = ({
         showError(copy.bulkUnhide.errors.fallback);
         return false;
       } finally {
+        isSubmittingRef.current = false;
         setIsSubmitting(false);
       }
     },
