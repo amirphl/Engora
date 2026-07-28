@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { GetCampaignResponse } from '../../../types/campaign';
 import { getApiUrl } from '../../../config/environment';
 import { useAuth } from '../../../hooks/useAuth';
@@ -10,11 +10,19 @@ export const useCancelCampaign = (copy: ReportsCopy) => {
   const { showError, showSuccess } = useToast();
   const [cancelling, setCancelling] = useState<Record<number, boolean>>({});
   const [cancelled, setCancelled] = useState<Record<number, boolean>>({});
+  const cancellingIdsRef = useRef(new Set<number>());
 
   const cancelCampaign = useCallback(
     async (campaign: GetCampaignResponse) => {
       const id = campaign.id;
-      if (!id || cancelling[id] || cancelled[id]) return;
+      if (
+        !id ||
+        cancellingIdsRef.current.has(id) ||
+        cancelling[id] ||
+        cancelled[id]
+      ) {
+        return;
+      }
       if (!accessToken) {
         showError(copy.modal.cancelError);
         return;
@@ -22,6 +30,7 @@ export const useCancelCampaign = (copy: ReportsCopy) => {
       const ok = window.confirm(copy.modal.cancelConfirm);
       if (!ok) return;
 
+      cancellingIdsRef.current.add(id);
       setCancelling(prev => ({ ...prev, [id]: true }));
       try {
         const resp = await fetch(getApiUrl(`/campaigns/${id}/cancel`), {
@@ -50,6 +59,7 @@ export const useCancelCampaign = (copy: ReportsCopy) => {
       } catch {
         showError(copy.modal.cancelError);
       } finally {
+        cancellingIdsRef.current.delete(id);
         setCancelling(prev => ({ ...prev, [id]: false }));
       }
     },
