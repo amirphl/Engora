@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { apiService } from '../services/api';
+import { getApiErrorMessage } from '../utils/errorHandler';
 import {
+  AudienceTargetingMethod,
   CampaignPlatform,
   GetCampaignResponse,
   ListSMSCampaignsParams,
@@ -17,22 +19,22 @@ import BulkUnhideActionBar from './reports/components/BulkUnhideActionBar';
 import { useHideCampaigns } from './reports/hooks/useHideCampaigns';
 import { useUnhideCampaigns } from './reports/hooks/useUnhideCampaigns';
 import { getReportsCopy } from './reports/translations';
+import { useToast } from '../hooks/useToast';
+import { normalizeCampaignResponseToDraft } from '../utils/campaignCreationDraft';
 
 type CampaignPhaseFilter = ListSMSCampaignsParams['phase'] | '';
 
+const isAudienceTargetingMethod = (
+  value: unknown
+): value is AudienceTargetingMethod =>
+  value === 'standard' || value === 'smart_targeting' || value === 'excel';
+
 const ReportsPage: React.FC = () => {
   const { accessToken } = useAuth();
+  const { showError } = useToast();
   const { language } = useLanguage();
   const copy = useMemo(() => getReportsCopy(language), [language]);
-  const {
-    updateLevel,
-    updateContent,
-    updateBudget,
-    updatePayment,
-    setCampaignUuid,
-    setCampaignId,
-    goToStep,
-  } = useCampaign();
+  const { replaceCampaignData } = useCampaign();
   const { navigate } = useNavigation();
   const [items, setItems] = useState<GetCampaignResponse[]>([]);
   const [loading, setLoading] = useState(false);
@@ -65,14 +67,17 @@ const ReportsPage: React.FC = () => {
   // Guards for double-invocation (StrictMode) and concurrent fetches
   const isFetchingRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
+  const fixRestartInFlightRef = useRef(false);
 
   const { hideCampaigns, isSubmitting: isHidingCampaigns } = useHideCampaigns({
     copy,
     onHidden: hiddenCampaignIds => {
       const hiddenCampaignIdSet = new Set(hiddenCampaignIds);
       setItems(prevItems =>
-        prevItems.filter(
-          item => item.id == null || !hiddenCampaignIdSet.has(item.id)
+        prevItems.map(item =>
+          item.id != null && hiddenCampaignIdSet.has(item.id)
+            ? { ...item, hidden: true }
+            : item
         )
       );
       setSelectedCampaignIds([]);
@@ -86,8 +91,10 @@ const ReportsPage: React.FC = () => {
       onUnhidden: unhiddenCampaignIds => {
         const unhiddenCampaignIdSet = new Set(unhiddenCampaignIds);
         setItems(prevItems =>
-          prevItems.filter(
-            item => item.id == null || !unhiddenCampaignIdSet.has(item.id)
+          prevItems.map(item =>
+            item.id != null && unhiddenCampaignIdSet.has(item.id)
+              ? { ...item, hidden: false }
+              : item
           )
         );
         setSelectedCampaignIds([]);
@@ -126,7 +133,18 @@ const ReportsPage: React.FC = () => {
 
   // Fetch campaigns whenever page/order/filter change
   useEffect(() => {
-    if (!accessToken) return;
+    if (!accessToken) {
+      abortRef.current?.abort();
+      abortRef.current = null;
+      isFetchingRef.current = false;
+      setItems([]);
+      setSelected(null);
+      setSelectedCampaignIds([]);
+      setLoading(false);
+      setError(null);
+      setHasMore(true);
+      return;
+    }
 
     // When filters change while page > 1, skip: the reset effect will set page=1 and re-trigger
     const prev = prevFiltersRef.current;
@@ -156,6 +174,8 @@ const ReportsPage: React.FC = () => {
     ) {
       setError(copy.invalidDateRange);
       setLoading(false);
+      setHasMore(false);
+      isFetchingRef.current = false;
       return;
     }
 
@@ -189,7 +209,14 @@ const ReportsPage: React.FC = () => {
 
         if (res.success && res.data) {
           const newItems = res.data.items || [];
-          setItems(prev => (page === 1 ? newItems : [...prev, ...newItems]));
+          setItems(prev => {
+            if (page === 1) return newItems;
+            const existingUuids = new Set(prev.map(item => item.uuid));
+            return [
+              ...prev,
+              ...newItems.filter(item => !existingUuids.has(item.uuid)),
+            ];
+          });
           if (
             res.data.pagination &&
             typeof res.data.pagination.total_pages === 'number'
@@ -210,8 +237,10 @@ const ReportsPage: React.FC = () => {
         setError(msg);
         setHasMore(false);
       } finally {
-        setLoading(false);
-        isFetchingRef.current = false;
+        if (abortRef.current === controller) {
+          setLoading(false);
+          isFetchingRef.current = false;
+        }
       }
     };
 
@@ -262,21 +291,24 @@ const ReportsPage: React.FC = () => {
     }, 1000);
   };
 
-  // Infinite scroll handler
-  useEffect(() => {
-    const onScroll = () => {
-      if (loading || !hasMore || isFetchingRef.current) return;
-      const threshold = 200; // px from bottom
-      const scrolled =
-        window.innerHeight + window.scrollY >=
-        document.body.offsetHeight - threshold;
-      if (scrolled) {
-        setPage(prev => prev + 1);
-      }
-    };
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, [loading, hasMore]);
+  const handleTableScroll = (event: React.UIEvent<HTMLDivElement>) => {
+    if (loading || !hasMore || isFetchingRef.current) return;
+
+    const { clientHeight, scrollHeight, scrollTop } = event.currentTarget;
+    const threshold = 200; // px from the table viewport's bottom
+    if (scrollTop + clientHeight < scrollHeight - threshold) return;
+
+    // Prevent multiple scroll events from requesting the same next page before
+    // the effect that performs the request has started.
+    isFetchingRef.current = true;
+    setPage(prev => prev + 1);
+  };
+
+  const handleLoadMore = () => {
+    if (loading || !hasMore || isFetchingRef.current) return;
+    isFetchingRef.current = true;
+    setPage(prev => prev + 1);
+  };
 
   useEffect(
     () => () => {
@@ -348,40 +380,75 @@ const ReportsPage: React.FC = () => {
     setSelected(null);
   };
 
-  const handleFixAndRestart = () => {
-    if (!selected) return;
-    // Clear id and uuid so step 1 creates a fresh campaign
-    setCampaignId(undefined);
-    setCampaignUuid('');
-    updateLevel({
-      campaignTitle: selected.title || '',
-      platform: selected.platform ?? 'sms',
-      level1: selected.level1 || '',
-      level2s: Array.isArray(selected.level2s) ? selected.level2s : [],
-      level3s: Array.isArray(selected.level3s) ? selected.level3s : [],
-      audienceGrades: Array.isArray(selected.audience_grades)
-        ? selected.audience_grades
-        : [],
-      tags: Array.isArray(selected.tags) ? selected.tags : [],
-      bundleId: selected.bundle_id ?? null,
-      phase: selected.phase ?? undefined,
-    });
-    updateContent({
-      insertLink: false,
-      link: selected.adlink || '',
-      text: selected.content || '',
-      scheduleAt: selected.scheduleat || undefined,
-      lineNumber: selected.line_number || '',
-      platformSettingsId: selected.platform_settings_id ?? null,
-      mediaUuid: selected.media_uuid ?? null,
-    });
-    updateBudget({
-      totalBudget: selected.budget || 0,
-    });
-    updatePayment({ termsAccepted: false });
-    goToStep(1);
-    navigate('/campaign-creation');
-    closeModal();
+  const handleFixAndRestart = async () => {
+    if (!selected || fixRestartInFlightRef.current) return;
+    fixRestartInFlightRef.current = true;
+    try {
+      const audienceTargetingMethod = isAudienceTargetingMethod(
+        selected.audience_targeting_method
+      )
+        ? selected.audience_targeting_method
+        : selected.target_audience_excel_file_uuid != null
+          ? 'excel'
+          : 'standard';
+      let selectedTagIds: number[] = [];
+      let selectedRawCapacity = 0;
+
+      if (audienceTargetingMethod === 'smart_targeting') {
+        apiService.setAccessToken(accessToken || null);
+        const response = await apiService.getCampaignSmartTargetingSelection(
+          selected.uuid
+        );
+        if (!response.success || !response.data) {
+          showError(
+            getApiErrorMessage(
+              response,
+              language,
+              language === 'fa'
+                ? 'بازیابی انتخاب هدف‌گیری هوشمند ناموفق بود.'
+                : 'Failed to restore the Smart Targeting selection.'
+            )
+          );
+          return;
+        }
+
+        selectedTagIds = Array.from(
+          new Set(
+            (response.data.selected_tag_ids || []).filter(
+              id => Number.isInteger(id) && id > 0
+            )
+          )
+        );
+        selectedRawCapacity = Math.max(
+          0,
+          response.data.summary?.selected_raw_capacity ?? 0
+        );
+      }
+
+      const draft = normalizeCampaignResponseToDraft(selected, {
+        id: null,
+        uuid: '',
+        clearSchedule: true,
+        smartTargetingSelection: {
+          selectedTagIds,
+          selectedRawCapacity,
+        },
+        smartTargetingSelectionDirty:
+          audienceTargetingMethod === 'smart_targeting' &&
+          selectedTagIds.length > 0,
+      });
+      replaceCampaignData(draft, 1);
+      navigate('/campaign-creation');
+      closeModal();
+    } catch {
+      showError(
+        language === 'fa'
+          ? 'راه‌اندازی مجدد کمپین ناموفق بود.'
+          : 'Failed to restart the campaign.'
+      );
+    } finally {
+      fixRestartInFlightRef.current = false;
+    }
   };
 
   const formatReportDateTime = (iso?: string) => {
@@ -416,10 +483,13 @@ const ReportsPage: React.FC = () => {
     }
   };
 
-  const displayedItems =
-    bulkUnhideMode || showHiddenCampaigns
-      ? items
-      : items.filter(item => !item.hidden);
+  const displayedItems = bulkUnhideMode
+    ? items.filter(item => item.hidden)
+    : bulkHideMode
+      ? items.filter(item => !item.hidden)
+      : showHiddenCampaigns
+        ? items
+        : items.filter(item => !item.hidden);
 
   return (
     <div className='min-h-screen bg-gray-50'>
@@ -460,6 +530,7 @@ const ReportsPage: React.FC = () => {
           items={displayedItems}
           copy={copy}
           formatDateTime={formatReportDateTime}
+          onTableScroll={handleTableScroll}
           onDetails={openDetails}
           truncateText={truncateText}
           bulkHideMode={bulkHideMode}
@@ -488,6 +559,17 @@ const ReportsPage: React.FC = () => {
 
         {loading && (
           <div className='text-center text-gray-600 mt-4'>{copy.loading}</div>
+        )}
+        {hasMore && !loading && (
+          <div className='mt-4 text-center'>
+            <button
+              type='button'
+              onClick={handleLoadMore}
+              className='rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50'
+            >
+              {copy.loadMore}
+            </button>
+          </div>
         )}
         {!hasMore && !loading && items.length > 0 && (
           <div className='text-center text-gray-400 text-sm mt-4'>
