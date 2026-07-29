@@ -8,7 +8,10 @@ import { useNavigation } from '../contexts/NavigationContext';
 import { useToast } from '../hooks/useToast';
 import { apiService } from '../services/api';
 import { getApiErrorMessage } from '../utils/errorHandler';
-import { serializeCampaignPayload } from '../utils/campaignUtils';
+import {
+  serializeCampaignPayload,
+  validateCampaignContent,
+} from '../utils/campaignUtils';
 import { useCampaignValidation } from '../hooks/useCampaignValidation';
 import CampaignSegmentStep from '../components/campaign/CampaignSegmentStep';
 import CampaignContentStep from '../components/campaign/CampaignContentStep';
@@ -16,6 +19,7 @@ import CampaignBudgetStep from '../components/campaign/CampaignBudgetStep';
 import CampaignPaymentStep from '../components/campaign/CampaignPaymentStep';
 import { budgetI18n } from '../components/campaign/budget/budgetTranslations';
 import { contentI18n } from '../components/campaign/content/contentTranslations';
+import { paymentI18n } from '../components/campaign/payment/paymentTranslations';
 import Button from '../components/ui/Button';
 import Stepper from '../components/ui/Stepper';
 import {
@@ -27,11 +31,13 @@ import {
 const CampaignCreationPage: React.FC = () => {
   const { t } = useTranslation();
   const { isRTL, language } = useLanguage();
-  const { accessToken } = useAuth();
+  const { accessToken, user } = useAuth();
   const budgetCopy =
     budgetI18n[language as keyof typeof budgetI18n] || budgetI18n.en;
   const contentCopy =
     contentI18n[language as keyof typeof contentI18n] || contentI18n.en;
+  const paymentCopy =
+    paymentI18n[language as keyof typeof paymentI18n] || paymentI18n.en;
   const {
     currentStep,
     campaignData,
@@ -41,15 +47,22 @@ const CampaignCreationPage: React.FC = () => {
     goToStep,
     setCampaignId,
     setCampaignUuid,
+    updateLevel,
     resetCampaign,
   } = useCampaign();
   const { showError, showSuccess } = useToast();
   const { navigate } = useNavigation();
   const [isFinishing, setIsFinishing] = React.useState(false);
   const [isAdvancing, setIsAdvancing] = React.useState(false);
+  const advancingRef = React.useRef(false);
+  const finishingRef = React.useRef(false);
 
   // Use the validation hook
-  const validation = useCampaignValidation(campaignData, currentStep);
+  const validation = useCampaignValidation(
+    campaignData,
+    currentStep,
+    user?.account_type === 'marketing_agency'
+  );
 
   // Campaign data is now retained when navigating away and returning
   // Only reset when campaign is actually finished (see handleFinish function)
@@ -58,6 +71,16 @@ const CampaignCreationPage: React.FC = () => {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentStep]);
+
+  useEffect(() => {
+    if (validation.isStepAccessible(currentStep)) return;
+    for (let step = 1; step < currentStep; step += 1) {
+      if (!validation.isStepCompleted(step)) {
+        goToStep(step);
+        return;
+      }
+    }
+  }, [currentStep, goToStep, validation]);
 
   // Campaign UUID will be created when user clicks "next" on the segment page (step 1)
 
@@ -72,7 +95,27 @@ const CampaignCreationPage: React.FC = () => {
   }, [accessToken]);
 
   const handleNextStep = async () => {
-    if (isAdvancing) return;
+    if (advancingRef.current) return;
+    const liveContentValidation =
+      currentStep >= 2
+        ? validateCampaignContent(
+            campaignData.content,
+            campaignData.segment.platform
+          )
+        : { isValid: true, error: null };
+    if (
+      !validation.canProceedToNextStep(currentStep) ||
+      !liveContentValidation.isValid
+    ) {
+      const message =
+        liveContentValidation.error ||
+        validation.getStepErrors(currentStep)[0] ||
+        'Please complete the current step';
+      showError(message);
+      return;
+    }
+
+    advancingRef.current = true;
     setIsAdvancing(true);
 
     try {
@@ -83,22 +126,7 @@ const CampaignCreationPage: React.FC = () => {
       apiService.setAccessToken(accessToken);
 
       if (currentStep === 1) {
-        const savedData = localStorage.getItem('campaign_creation_data');
-        const hasExistingCampaign =
-          (savedData &&
-            (() => {
-              try {
-                const parsed = JSON.parse(savedData);
-                const storedCampaign = {
-                  ...parsed,
-                  segment: parsed.segment ?? parsed.level,
-                };
-                return storedCampaign.uuid && storedCampaign.uuid !== '';
-              } catch {
-                return false;
-              }
-            })()) ||
-          (!!campaignData.uuid && campaignData.uuid !== '');
+        const hasExistingCampaign = Boolean(campaignData.uuid.trim());
 
         if (hasExistingCampaign) {
           if (!campaignData.uuid) {
@@ -128,13 +156,16 @@ const CampaignCreationPage: React.FC = () => {
           const payload: CreateCampaignPayload =
             serializeCampaignPayload(campaignData);
           const response = await apiService.createCampaign(payload);
-          if (response.success && response.data && response.data.uuid) {
+          if (
+            response.success &&
+            response.data &&
+            typeof response.data.uuid === 'string' &&
+            response.data.uuid.trim() &&
+            Number.isInteger(response.data.id) &&
+            response.data.id > 0
+          ) {
             setCampaignUuid(response.data.uuid);
-            setCampaignId(
-              typeof response.data.id === 'number' && response.data.id > 0
-                ? response.data.id
-                : undefined
-            );
+            setCampaignId(response.data.id);
           } else {
             const errorMessage = getApiErrorMessage(
               response,
@@ -145,6 +176,7 @@ const CampaignCreationPage: React.FC = () => {
             return;
           }
         }
+        updateLevel({ smartTargetingSelectionDirty: false });
         nextStep();
         return;
       }
@@ -206,9 +238,10 @@ const CampaignCreationPage: React.FC = () => {
       }
 
       nextStep();
-    } catch (error) {
+    } catch {
       showError('Network error - please try again');
     } finally {
+      advancingRef.current = false;
       setIsAdvancing(false);
     }
   };
@@ -239,7 +272,26 @@ const CampaignCreationPage: React.FC = () => {
   };
 
   const handleFinish = async () => {
-    if (isFinishing) return;
+    if (finishingRef.current) return;
+    const liveContentValidation = validateCampaignContent(
+      campaignData.content,
+      campaignData.segment.platform
+    );
+    if (!validation.canFinishCampaign() || !liveContentValidation.isValid) {
+      const invalidStep = [1, 2, 3, 4].find(
+        step => !validation.isStepCompleted(step)
+      );
+      showError(
+        liveContentValidation.error ||
+          (invalidStep
+            ? validation.getStepErrors(invalidStep)[0]
+            : undefined) ||
+          'Please complete every campaign step'
+      );
+      return;
+    }
+
+    finishingRef.current = true;
     setIsFinishing(true);
     try {
       // Call API to update campaign
@@ -273,7 +325,10 @@ const CampaignCreationPage: React.FC = () => {
           showError(t('campaign.errors.invalidScheduleTime'));
           return;
         }
-        throw new Error(response.message || 'Failed to update campaign');
+        showError(
+          getApiErrorMessage(response, language, 'Failed to update campaign')
+        );
+        return;
       }
 
       // Clear campaign data from localStorage completely
@@ -290,16 +345,19 @@ const CampaignCreationPage: React.FC = () => {
           : 'Campaign completed successfully!';
       showSuccess(successMessage);
       navigate('/dashboard');
-    } catch (error) {
+    } catch {
       // Show error message but DO NOT redirect to dashboard
       // This prevents infinite loops and allows user to see the error
       showError(
-        `Failed to complete campaign: ${error instanceof Error ? error.message : 'Unknown error'}`
+        language === 'fa'
+          ? 'تکمیل کمپین ناموفق بود. لطفاً دوباره تلاش کنید.'
+          : 'Failed to complete campaign. Please try again.'
       );
 
       // DO NOT redirect to dashboard on error
       // User stays on payment page to see the error message
     } finally {
+      finishingRef.current = false;
       setIsFinishing(false);
     }
   };
@@ -339,12 +397,12 @@ const CampaignCreationPage: React.FC = () => {
       isCompleted: validation.isStepCompleted(3),
       isAccessible: validation.isStepAccessible(3),
     },
-    // {
-    //   id: 4,
-    //   title: paymentCopy.title,
-    //   isCompleted: validation.isStepCompleted(4),
-    //   isAccessible: validation.isStepAccessible(4),
-    // },
+    {
+      id: 4,
+      title: paymentCopy.title,
+      isCompleted: validation.isStepCompleted(4),
+      isAccessible: validation.isStepAccessible(4),
+    },
   ];
 
   return (
