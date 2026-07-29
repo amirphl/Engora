@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { GetCampaignResponse } from '../../../types/campaign';
 import { BundleListItem } from '../../../types/bundle';
@@ -10,7 +10,6 @@ import { downloadBlob } from '../../wallet/utils/download';
 import { useCampaignClickReportExport } from '../hooks/useCampaignClickReportExport';
 import {
   LINK_PLACEHOLDER,
-  getShortLinkDomainOrDefault,
   normalizeLinkPlaceholder,
 } from '../../../utils/campaignUtils';
 import ReportMediaPreview from './reportDetails/ReportMediaPreview';
@@ -69,6 +68,11 @@ const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
   const [bundle, setBundle] = useState<BundleListItem | null>(null);
   const [bundleLoading, setBundleLoading] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [smartTargetingSummary, setSmartTargetingSummary] = useState<{
+    selectedTagCount: number;
+    selectedRawCapacity: number;
+  } | null>(null);
+  const isExportingRef = useRef(false);
   const { exportClickReport, isExporting: isExportingClickReport } =
     useCampaignClickReportExport({ copy });
 
@@ -105,6 +109,53 @@ const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
     };
   }, [accessToken, campaign.bundle_id]);
 
+  useEffect(() => {
+    setSmartTargetingSummary(null);
+    if (
+      campaign.audience_targeting_method !== 'smart_targeting' ||
+      !campaign.uuid ||
+      !accessToken
+    ) {
+      return;
+    }
+
+    let isActive = true;
+    apiService.setAccessToken(accessToken);
+    apiService
+      .getCampaignSmartTargetingSelection(campaign.uuid)
+      .then(response => {
+        if (!isActive || !response.success || !response.data) return;
+
+        const selectedTagIds = Array.from(
+          new Set(
+            (response.data.selected_tag_ids || []).filter(
+              tagId => Number.isInteger(tagId) && tagId > 0
+            )
+          )
+        );
+        const responseCount = response.data.summary?.selected_tag_count;
+        const responseCapacity = response.data.summary?.selected_raw_capacity;
+        setSmartTargetingSummary({
+          selectedTagCount:
+            typeof responseCount === 'number' &&
+            Number.isInteger(responseCount) &&
+            responseCount >= 0
+              ? responseCount
+              : selectedTagIds.length,
+          selectedRawCapacity:
+            typeof responseCapacity === 'number' &&
+            Number.isFinite(responseCapacity)
+              ? Math.max(0, responseCapacity)
+              : 0,
+        });
+      })
+      .catch(() => {});
+
+    return () => {
+      isActive = false;
+    };
+  }, [accessToken, campaign.audience_targeting_method, campaign.uuid]);
+
   const hasTrackingResults = useMemo(() => {
     const value = campaign.statistics?.trackingResults;
     if (Array.isArray(value)) return value.length > 0;
@@ -123,21 +174,26 @@ const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
   const campaignCost = getCampaignCostValue(campaign);
   const refund = getRefundValue(campaign);
   const audienceGrades = joinValues(campaign.audience_grades);
-  const shortLinkDomain = hasAdlink
-    ? getShortLinkDomainOrDefault(campaign.short_link_domain)
-    : FALLBACK_VALUE;
+  const normalizedShortLinkDomain =
+    typeof campaign.short_link_domain === 'string' &&
+    campaign.short_link_domain.trim()
+      ? campaign.short_link_domain.trim()
+      : null;
+  const shortLinkDomain =
+    hasAdlink && normalizedShortLinkDomain
+      ? normalizedShortLinkDomain
+      : FALLBACK_VALUE;
 
   const renderedContent = useMemo(() => {
     if (!campaign.content) return FALLBACK_VALUE;
     const normalized = normalizeLinkPlaceholder(campaign.content);
     if (!hasAdlink) return normalized;
 
-    const previewDomain =
-      shortLinkDomain !== FALLBACK_VALUE
-        ? `${shortLinkDomain}/xxxxxx`
-        : 'xxxxxx';
-    return normalized.split(LINK_PLACEHOLDER).join(previewDomain);
-  }, [campaign.content, hasAdlink, shortLinkDomain]);
+    const previewLink = normalizedShortLinkDomain
+      ? `${normalizedShortLinkDomain}/xxxxxx`
+      : campaign.adlink!.trim().replace(/\{uid\}/g, 'xxxxxx');
+    return normalized.split(LINK_PLACEHOLDER).join(previewLink);
+  }, [campaign.adlink, campaign.content, hasAdlink, normalizedShortLinkDomain]);
 
   const getExportErrorMessage = (message?: string): string => {
     const code = (message || '').trim().toUpperCase();
@@ -152,12 +208,13 @@ const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
   };
 
   const handleExportReport = async () => {
-    if (isExporting) return;
+    if (isExportingRef.current) return;
     if (!campaign.uuid) {
       showError(copy.modal.exportMissingCampaignUuid);
       return;
     }
 
+    isExportingRef.current = true;
     setIsExporting(true);
     try {
       apiService.setAccessToken(accessToken || null);
@@ -173,6 +230,7 @@ const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
     } catch {
       showError(copy.modal.exportError);
     } finally {
+      isExportingRef.current = false;
       setIsExporting(false);
     }
   };
@@ -299,6 +357,10 @@ const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
             value={formatDateTime(campaign.created_at)}
           />
           <ReportField
+            label={copy.modal.updatedAt}
+            value={formatDateTime(campaign.updated_at)}
+          />
+          <ReportField
             label={copy.table.status}
             value={copy.statuses[campaign.status] || campaign.status}
           />
@@ -318,21 +380,45 @@ const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
           {segmentationMethod === copy.modal.segmentationMethodLevels ? (
             <>
               <ReportField
+                label={copy.modal.level1}
+                value={formatDisplayValue(campaign.level1)}
+              />
+              <ReportField
+                label={copy.modal.level2}
+                value={joinValues(campaign.level2s)}
+              />
+              <ReportField
                 label={copy.modal.level3v2}
                 value={joinValues(campaign.level3s)}
               />
               <ReportField
-                label={copy.modal.segmentPriceFactor}
-                value={formatNumberValue(campaign.segment_price_factor, {
-                  maximumFractionDigits: 2,
-                })}
-              />
-              <ReportField
-                label={copy.modal.audienceGrades}
-                value={audienceGrades}
+                label={copy.modal.subsegments}
+                value={joinValues(campaign.tags)}
               />
             </>
-          ) : (
+          ) : segmentationMethod ===
+            copy.modal.segmentationMethodSmartTargeting ? (
+            <>
+              <ReportField
+                label={copy.modal.selectedTagCount}
+                value={
+                  smartTargetingSummary
+                    ? formatNumberValue(smartTargetingSummary.selectedTagCount)
+                    : FALLBACK_VALUE
+                }
+              />
+              <ReportField
+                label={copy.modal.selectedRawCapacity}
+                value={
+                  smartTargetingSummary
+                    ? formatNumberValue(
+                        smartTargetingSummary.selectedRawCapacity
+                      )
+                    : FALLBACK_VALUE
+                }
+              />
+            </>
+          ) : segmentationMethod === copy.modal.segmentationMethodExcelFile ? (
             <ReportField
               label={copy.modal.excelFileUuid}
               value={formatDisplayValue(
@@ -340,7 +426,33 @@ const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
               )}
               fullWidth
             />
-          )}
+          ) : null}
+          <ReportField
+            label={copy.modal.segmentPriceFactor}
+            value={formatNumberValue(campaign.segment_price_factor, {
+              maximumFractionDigits: 2,
+            })}
+          />
+          <ReportField
+            label={copy.modal.audienceGrades}
+            value={audienceGrades}
+          />
+          <ReportField
+            label={copy.modal.sex}
+            value={formatDisplayValue(campaign.sex)}
+          />
+          <ReportField
+            label={copy.modal.cities}
+            value={joinValues(campaign.city)}
+          />
+          <ReportField
+            label={copy.modal.bundleCategory}
+            value={formatDisplayValue(campaign.job_category)}
+          />
+          <ReportField
+            label={copy.modal.bundleJob}
+            value={formatDisplayValue(campaign.job)}
+          />
         </ReportFieldGrid>
       </ReportSection>
 
@@ -358,6 +470,13 @@ const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
             label={platformDetails.priceLabel}
             value={platformDetails.priceValue}
           />
+          {(campaign.platform ?? 'sms') !== 'sms' &&
+          campaign.platform_settings_id ? (
+            <ReportField
+              label={`${copy.modal.platformSettingsName} ID`}
+              value={formatNumberValue(campaign.platform_settings_id)}
+            />
+          ) : null}
         </ReportFieldGrid>
       </ReportSection>
 
@@ -368,7 +487,9 @@ const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
             value={
               <p className='whitespace-pre-wrap'>
                 {renderedContent !== FALLBACK_VALUE
-                  ? `${renderedContent}\nلغو۱۱`
+                  ? campaign.platform === 'sms' || !campaign.platform
+                    ? `${renderedContent}\nلغو۱۱`
+                    : renderedContent
                   : FALLBACK_VALUE}
               </p>
             }
@@ -430,6 +551,10 @@ const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
             value={formatNumberValue(refund, {
               maximumFractionDigits: 2,
             })}
+          />
+          <ReportField
+            label={copy.modal.numAudience}
+            value={formatNumberValue(campaign.num_audience)}
           />
         </ReportFieldGrid>
       </ReportSection>
