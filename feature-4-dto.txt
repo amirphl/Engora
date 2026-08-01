@@ -1,0 +1,33 @@
+SampleSizePerTag *uint64 `json:"sample_size_per_tag,omitempty" validate:"omitempty,gt=0"`
+
+SampleSizePerTag is added to the following DTOs:
+AdminCustomerCampaignItem
+CreateCampaignRequest
+UpdateCampaignRequest
+GetCampaignResponse
+AdminGetCampaignResponse
+
+
+Also we have following DTOs as new DTOs:
+
+type SmartTargetingTestSamplingPreviewRequest struct {
+	CustomerID   uint   `json:"-"`
+	CampaignUUID string `json:"-"`
+}
+
+type SmartTargetingTestSamplingTagResult struct {
+	TagID          uint  `json:"tag_id"`
+	SelectionOrder int   `json:"selection_order"`
+	Satisfied      bool  `json:"satisfied"`
+	AvailableCount int64 `json:"available_count"`
+}
+
+type SmartTargetingTestSamplingPreviewResponse struct {
+	SampleSizePerTag       uint64                                `json:"sample_size_per_tag"`
+	TagSamplingOrder       []uint                                `json:"tag_sampling_order"`
+	SatisfiedTags          []SmartTargetingTestSamplingTagResult `json:"satisfied_tags"`
+	UnsatisfiedTags        []SmartTargetingTestSamplingTagResult `json:"unsatisfied_tags"`
+	SatisfiedTagCount      int                                   `json:"satisfied_tag_count"`
+	EffectiveAudienceCount uint64                                `json:"effective_audience_count"`
+	CampaignCost           uint64                                `json:"campaign_cost"`
+}
