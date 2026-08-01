@@ -1,6 +1,6 @@
 // Level Selection State
 // This represents the complete selection state for the level component
-import type { AudienceTargetingMethod } from './campaign';
+import type { AudienceGrade, AudienceTargetingMethod } from './campaign';
 
 export interface LevelMetadata {
   [key: string]: any;
@@ -25,6 +25,7 @@ export interface LevelSelectionState {
   audienceTargetingMethod: AudienceTargetingMethod;
   selectedTagIds: number[];
   smartTargetingSelectedRawCapacity: number;
+  smartTargetingScoreClasses: AudienceGrade[];
 
   // Metadata from selected items
   metadata: Record<string, LevelMetadata>;
@@ -48,6 +49,7 @@ export const createEmptyLevelSelection = (): LevelSelectionState => ({
   audienceTargetingMethod: 'standard',
   selectedTagIds: [],
   smartTargetingSelectedRawCapacity: 0,
+  smartTargetingScoreClasses: [],
   metadata: {},
   tags: [],
   count: 0,
@@ -105,6 +107,18 @@ export const loadLevelSelection = (): LevelSelectionState | null => {
             : typeof parsed.targetAudienceExcelFileUuid === 'string'
               ? 'excel'
               : 'standard';
+      const smartTargetingScoreClasses = Array.isArray(
+        parsed.smartTargetingScoreClasses
+      )
+        ? Array.from(
+            new Set(
+              parsed.smartTargetingScoreClasses.filter(
+                (item): item is AudienceGrade =>
+                  item === 'A' || item === 'B' || item === 'C'
+              )
+            )
+          )
+        : [];
 
       return {
         ...defaults,
@@ -126,6 +140,7 @@ export const loadLevelSelection = (): LevelSelectionState | null => {
           Number.isFinite(parsed.smartTargetingSelectedRawCapacity)
             ? Math.max(0, parsed.smartTargetingSelectedRawCapacity)
             : 0,
+        smartTargetingScoreClasses,
         metadata:
           parsed.metadata &&
           typeof parsed.metadata === 'object' &&
