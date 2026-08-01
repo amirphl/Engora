@@ -1,0 +1,277 @@
+// PreviewSmartTargetingTestSampling calculates ordered, all-or-nothing per-tag
+// samples. It never persists audience IDs; scheduler preparation is final.
+// @Summary Preview Smart Targeting Test sampling
+// @Tags Campaigns
+// @Produce json
+// @Security BearerAuth
+// @Param uuid path string true "Owned Smart Targeting Test campaign UUID" format(uuid)
+// @Success 200 {object} dto.APIResponse{data=dto.SmartTargetingTestSamplingPreviewResponse}
+// @Router /api/v1/campaigns/{uuid}/smart-targeting/test-sampling-preview [post]
+func (h *CampaignHandler) PreviewSmartTargetingTestSampling(c fiber.Ctx) error {
+	customerID, ok := c.Locals("customer_id").(uint)
+	if !ok {
+		return h.ErrorResponse(c, fiber.StatusUnauthorized, "Customer ID not found in context", "MISSING_CUSTOMER_ID", nil)
+	}
+	ctx, cancel := h.createRequestContextWithTimeout(c, "/api/v1/campaigns/:uuid/smart-targeting/test-sampling-preview", 60*time.Second)
+	defer cancel()
+	result, err := h.campaignFlow.PreviewSmartTargetingTestSampling(ctx, &dto.SmartTargetingTestSamplingPreviewRequest{
+		CustomerID: customerID, CampaignUUID: c.Params("uuid"),
+	}, businessflow.NewClientMetadata(c.IP(), c.Get("User-Agent")))
+	if err != nil {
+		return h.handleCampaignFlowError(c, err, fiber.StatusInternalServerError, "Failed to preview Smart Targeting Test sampling", "SMART_TARGETING_TEST_PREVIEW_FAILED")
+	}
+	return h.SuccessResponse(c, fiber.StatusOK, "Smart Targeting Test sampling preview calculated successfully", result)
+}
+
+
+We have also handled following errors in ApproveCampaign API:
+		if errors.Is(err, businessflow.ErrSmartTargetingTestPreviewRequired) {
+			return h.ErrorResponse(c, fiber.StatusConflict, businessflow.ErrSmartTargetingTestPreviewRequired.Error(), "SMART_TARGETING_TEST_PREVIEW_REQUIRED", nil)
+		}
+		if errors.Is(err, businessflow.ErrSmartTargetingTestNoSatisfiedTags) {
+			return h.ErrorResponse(c, fiber.StatusConflict, businessflow.ErrSmartTargetingTestNoSatisfiedTags.Error(), "SMART_TARGETING_TEST_NO_SATISFIED_TAGS", nil)
+		}
+		if errors.Is(err, businessflow.ErrSmartTargetingSampleSizeRequired) {
+			return h.ErrorResponse(c, fiber.StatusBadRequest, businessflow.ErrSmartTargetingSampleSizeRequired.Error(), "SMART_TARGETING_SAMPLE_SIZE_REQUIRED", nil)
+		}
+		if errors.Is(err, businessflow.ErrSmartTargetingSampleSizeInvalid) {
+			return h.ErrorResponse(c, fiber.StatusBadRequest, businessflow.ErrSmartTargetingSampleSizeInvalid.Error(), "SMART_TARGETING_SAMPLE_SIZE_INVALID", nil)
+		}
+		if errors.Is(err, businessflow.ErrSmartTargetingTestAudienceCountOverflow) {
+			return h.ErrorResponse(c, fiber.StatusBadRequest, businessflow.ErrSmartTargetingTestAudienceCountOverflow.Error(), "SMART_TARGETING_TEST_AUDIENCE_COUNT_OVERFLOW", nil)
+		}
+
+    ErrSmartTargetingSampleSizeRequired         = errors.New("sample_size_per_tag is required for Smart Targeting Test campaigns")
+	ErrSmartTargetingSampleSizeInvalid          = errors.New("sample_size_per_tag must be a positive integer")
+	ErrSmartTargetingTestPreviewRequired        = errors.New("a current Smart Targeting Test sampling preview is required")
+	ErrSmartTargetingTestNoSatisfiedTags        = errors.New("no selected Smart Targeting tag can satisfy sample_size_per_tag")
+	ErrSmartTargetingTestAudienceCountOverflow  = errors.New("Smart Targeting Test audience count exceeds the supported range")
+
+Also the following function supports new errors:
+func (h *CampaignHandler) handleCampaignFlowError(c fiber.Ctx, err error, defaultStatus int, defaultMessage, defaultCode string) error {
+	var businessErr *businessflow.BusinessError
+	_ = errors.As(err, &businessErr)
+
+	if errors.Is(err, businessflow.ErrCampaignUUIDRequired) || errors.Is(err, businessflow.ErrCampaignUUIDInvalid) {
+		return h.ErrorResponse(c, fiber.StatusBadRequest, "Campaign UUID is invalid", "INVALID_CAMPAIGN_UUID", nil)
+	}
+	if errors.Is(err, businessflow.ErrBundleNotFound) {
+		return h.ErrorResponse(c, fiber.StatusNotFound, "Bundle not found", "BUNDLE_NOT_FOUND", nil)
+	}
+	if errors.Is(err, businessflow.ErrBundleAccessDenied) {
+		return h.ErrorResponse(c, fiber.StatusForbidden, "Bundle access denied", "BUNDLE_ACCESS_DENIED", nil)
+	}
+	if errors.Is(err, businessflow.ErrSmartTargetingSampleSizeRequired) {
+		return h.ErrorResponse(c, fiber.StatusBadRequest, businessflow.ErrSmartTargetingSampleSizeRequired.Error(), "SMART_TARGETING_SAMPLE_SIZE_REQUIRED", nil)
+	}
+	if errors.Is(err, businessflow.ErrSmartTargetingSampleSizeInvalid) {
+		return h.ErrorResponse(c, fiber.StatusBadRequest, businessflow.ErrSmartTargetingSampleSizeInvalid.Error(), "SMART_TARGETING_SAMPLE_SIZE_INVALID", nil)
+	}
+	if errors.Is(err, businessflow.ErrSmartTargetingTestPreviewRequired) {
+		return h.ErrorResponse(c, fiber.StatusConflict, businessflow.ErrSmartTargetingTestPreviewRequired.Error(), "SMART_TARGETING_TEST_PREVIEW_REQUIRED", nil)
+	}
+	if errors.Is(err, businessflow.ErrSmartTargetingTestNoSatisfiedTags) {
+		return h.ErrorResponse(c, fiber.StatusConflict, businessflow.ErrSmartTargetingTestNoSatisfiedTags.Error(), "SMART_TARGETING_TEST_NO_SATISFIED_TAGS", nil)
+	}
+	if errors.Is(err, businessflow.ErrSmartTargetingTestAudienceCountOverflow) {
+		return h.ErrorResponse(c, fiber.StatusBadRequest, businessflow.ErrSmartTargetingTestAudienceCountOverflow.Error(), "SMART_TARGETING_TEST_AUDIENCE_COUNT_OVERFLOW", nil)
+	}
+	if errors.Is(err, businessflow.ErrCampaignCostOverflow) {
+		return h.ErrorResponse(c, fiber.StatusBadRequest, businessflow.ErrCampaignCostOverflow.Error(), "CAMPAIGN_COST_OVERFLOW", nil)
+	}
+	if errors.Is(err, businessflow.ErrSmartTargetingTagsRequired) ||
+		errors.Is(err, businessflow.ErrSmartTargetingTagInvalid) ||
+		errors.Is(err, businessflow.ErrSmartTargetingScoreClassesInvalid) ||
+		errors.Is(err, businessflow.ErrSmartTargetingSortInvalid) ||
+		errors.Is(err, businessflow.ErrSmartTargetingScoreUnavailable) ||
+		errors.Is(err, businessflow.ErrSmartTargetingSearchTooLong) ||
+		errors.Is(err, businessflow.ErrSmartTargetingCountInvalid) ||
+		errors.Is(err, businessflow.ErrCampaignAudienceTargetingMethodInvalid) {
+		code := defaultCode
+		if businessErr != nil && businessErr.Code != "" {
+			code = businessErr.Code
+		}
+		return h.ErrorResponse(c, fiber.StatusBadRequest, err.Error(), code, nil)
+	}
+	if errors.Is(err, businessflow.ErrInvalidState) {
+		message, code := "Another request is already in progress", "INVALID_STATE"
+		if businessErr != nil {
+			if businessErr.Message != "" {
+				message = businessErr.Message
+			}
+			if businessErr.Code != "" {
+				code = businessErr.Code
+			}
+		}
+		return h.ErrorResponse(c, fiber.StatusConflict, message, code, nil)
+	}
+	if errors.Is(err, businessflow.ErrSmartTargetingCapacityPending) {
+		var pending *businessflow.SmartTargetingCapacityPendingError
+		if errors.As(err, &pending) && pending != nil {
+			return h.ErrorResponse(c, fiber.StatusConflict, "Exact Smart Targeting capacity calculation is pending; please wait and retry", "SMART_TARGETING_CAPACITY_PENDING", pending.Response)
+		}
+		return h.ErrorResponse(c, fiber.StatusConflict, "Exact Smart Targeting capacity calculation is pending; please wait and retry", "SMART_TARGETING_CAPACITY_PENDING", nil)
+	}
+	if errors.Is(err, businessflow.ErrSmartTargetingExactCapacityRequired) {
+		return h.ErrorResponse(c, fiber.StatusConflict, "A current exact Smart Targeting capacity calculation is required", "SMART_TARGETING_EXACT_CAPACITY_REQUIRED", nil)
+	}
+	if businessflow.IsCampaignNotFound(err) {
+		return h.ErrorResponse(c, fiber.StatusNotFound, "Campaign not found", "CAMPAIGN_NOT_FOUND", nil)
+	}
+	if businessflow.IsCampaignAccessDenied(err) {
+		return h.ErrorResponse(c, fiber.StatusForbidden, "Campaign access denied", "CAMPAIGN_ACCESS_DENIED", nil)
+	}
+	if businessflow.IsCampaignUpdateNotAllowed(err) {
+		return h.ErrorResponse(c, fiber.StatusForbidden, "Campaign cannot be updated in current status", "CAMPAIGN_UPDATE_NOT_ALLOWED", nil)
+	}
+	if businessflow.IsCampaignNotWaitingForApproval(err) {
+		return h.ErrorResponse(c, fiber.StatusForbidden, "Campaign cannot be cancelled in current status", "CAMPAIGN_CANCEL_NOT_ALLOWED", nil)
+	}
+	if businessflow.IsCampaignNotApproved(err) {
+		return h.ErrorResponse(c, fiber.StatusConflict, "Campaign is not approved", "CAMPAIGN_NOT_APPROVED", nil)
+	}
+	if businessflow.IsInsufficientCampaignCapacity(err) {
+		message, code := "Insufficient campaign capacity", "INSUFFICIENT_CAPACITY"
+		if businessErr != nil {
+			if businessErr.Message != "" {
+				message = businessErr.Message
+			}
+			if businessErr.Code != "" {
+				code = businessErr.Code
+			}
+		}
+		return h.ErrorResponse(c, fiber.StatusConflict, message, code, nil)
+	}
+	if businessflow.IsInsufficientFunds(err) {
+		return h.ErrorResponse(c, fiber.StatusConflict, "Insufficient funds", "INSUFFICIENT_FUNDS", nil)
+	}
+
+	if businessflow.IsCustomerNotFound(err) {
+		return h.ErrorResponse(c, fiber.StatusNotFound, "Customer not found", "CUSTOMER_NOT_FOUND", nil)
+	}
+	if businessflow.IsAccountInactive(err) {
+		return h.ErrorResponse(c, fiber.StatusUnauthorized, "Account is inactive", "ACCOUNT_INACTIVE", nil)
+	}
+	if businessflow.IsAccountTypeNotFound(err) {
+		return h.ErrorResponse(c, fiber.StatusBadRequest, "Account type not found", "ACCOUNT_TYPE_NOT_FOUND", nil)
+	}
+	if businessflow.IsWalletNotFound(err) {
+		return h.ErrorResponse(c, fiber.StatusNotFound, "Wallet not found", "WALLET_NOT_FOUND", nil)
+	}
+	if businessflow.IsBalanceSnapshotNotFound(err) {
+		return h.ErrorResponse(c, fiber.StatusNotFound, "Balance snapshot not found", "BALANCE_SNAPSHOT_NOT_FOUND", nil)
+	}
+	if businessflow.IsFreezeTransactionNotFound(err) {
+		return h.ErrorResponse(c, fiber.StatusConflict, "Freeze transaction not found", "FREEZE_TRANSACTION_NOT_FOUND", nil)
+	}
+	if businessflow.IsMultipleFreezeTransactionsFound(err) {
+		return h.ErrorResponse(c, fiber.StatusConflict, "Multiple freeze transactions found", "MULTIPLE_FREEZE_TRANSACTIONS_FOUND", nil)
+	}
+	if businessflow.IsCampaignDebitTransactionNotFound(err) {
+		return h.ErrorResponse(c, fiber.StatusConflict, "Campaign debit transaction not found", "CAMPAIGN_DEBIT_TRANSACTION_NOT_FOUND", nil)
+	}
+	if businessflow.IsMultipleCampaignDebitTransactionsFound(err) {
+		return h.ErrorResponse(c, fiber.StatusConflict, "Multiple campaign debit transactions found", "MULTIPLE_CAMPAIGN_DEBIT_TRANSACTIONS_FOUND", nil)
+	}
+
+	if businessflow.IsCampaignPlatformRequired(err) || businessflow.IsCampaignPlatformInvalid(err) {
+		return h.ErrorResponse(c, fiber.StatusBadRequest, "Invalid platform", "INVALID_PLATFORM", nil)
+	}
+	if businessflow.IsCampaignPlatformSettingRequired(err) {
+		return h.ErrorResponse(c, fiber.StatusBadRequest, "Platform settings is required for non-sms campaigns", "PLATFORM_SETTINGS_REQUIRED", nil)
+	}
+	if businessflow.IsCampaignPlatformSettingNotApplicable(err) {
+		return h.ErrorResponse(c, fiber.StatusBadRequest, "Platform settings is only applicable for non-sms campaigns", "PLATFORM_SETTINGS_NOT_APPLICABLE", nil)
+	}
+	if businessflow.IsCampaignPlatformSettingNotFound(err) {
+		return h.ErrorResponse(c, fiber.StatusBadRequest, "Platform settings not found", "PLATFORM_SETTINGS_NOT_FOUND", nil)
+	}
+	if businessflow.IsCampaignTestPlatformSettingsInvalid(err) {
+		return h.ErrorResponse(c, fiber.StatusBadRequest, "Platform settings are invalid for test send", "PLATFORM_SETTINGS_INVALID", nil)
+	}
+	if businessflow.IsCampaignTestRecipientMissing(err) {
+		return h.ErrorResponse(c, fiber.StatusBadRequest, "Target phone number is missing", "TEST_RECIPIENT_MISSING", nil)
+	}
+	if businessflow.IsCampaignTestStateNotAllowed(err) {
+		return h.ErrorResponse(c, fiber.StatusConflict, "Campaign state does not allow test send", "TEST_SEND_STATE_NOT_ALLOWED", nil)
+	}
+	if businessflow.IsCampaignTestRateLimited(err) {
+		return h.ErrorResponse(c, fiber.StatusTooManyRequests, "Please wait before sending another test message", "TEST_SEND_RATE_LIMITED", nil)
+	}
+	if businessflow.IsCampaignTestCooldownUnavailable(err) {
+		return h.ErrorResponse(c, fiber.StatusServiceUnavailable, "Test send cooldown is temporarily unavailable", "TEST_SEND_COOLDOWN_UNAVAILABLE", nil)
+	}
+	if businessflow.IsCampaignLineNumberNotApplicable(err) {
+		return h.ErrorResponse(c, fiber.StatusBadRequest, "Line number is only applicable for sms campaigns", "LINE_NUMBER_NOT_APPLICABLE", nil)
+	}
+	if businessflow.IsCampaignLineNumberRequired(err) {
+		return h.ErrorResponse(c, fiber.StatusBadRequest, "Line number is required for sms campaigns", "LINE_NUMBER_REQUIRED", nil)
+	}
+	if businessflow.IsLineNumberNotFound(err) {
+		return h.ErrorResponse(c, fiber.StatusBadRequest, "Line number not found", "LINE_NUMBER_NOT_FOUND", nil)
+	}
+	if businessflow.IsLineNumberNotActive(err) || businessflow.IsCampaignLineNumberNotActive(err) {
+		return h.ErrorResponse(c, fiber.StatusBadRequest, "Line number is not active", "LINE_NUMBER_NOT_ACTIVE", nil)
+	}
+
+	if businessflow.IsCampaignMediaNotFound(err) {
+		return h.ErrorResponse(c, fiber.StatusBadRequest, "Media not found", "MEDIA_NOT_FOUND", nil)
+	}
+	if businessflow.IsCampaignTargetAudienceExcelMediaNotFound(err) {
+		return h.ErrorResponse(c, fiber.StatusBadRequest, "Excel media not found", "EXCEL_MEDIA_NOT_FOUND", nil)
+	}
+	if businessflow.IsCampaignTargetAudienceExcelFileInvalid(err) {
+		return h.ErrorResponse(c, fiber.StatusBadRequest, "Excel file is invalid", "EXCEL_FILE_INVALID", nil)
+	}
+	if businessflow.IsSegmentPriceFactorNotFound(err) {
+		return h.ErrorResponse(c, fiber.StatusBadRequest, "Segment price factor not found", "SEGMENT_PRICE_FACTOR_NOT_FOUND", nil)
+	}
+	if businessflow.IsLevel3Required(err) {
+		return h.ErrorResponse(c, fiber.StatusBadRequest, "At least one level3 option is required", "LEVEL3_REQUIRED", nil)
+	}
+
+	if businessflow.IsCampaignTitleRequired(err) ||
+		businessflow.IsCampaignContentRequired(err) ||
+		businessflow.IsCampaignLevel1Required(err) ||
+		businessflow.IsCampaignLevel2sRequired(err) ||
+		businessflow.IsCampaignLevel3sRequired(err) ||
+		businessflow.IsCampaignBudgetRequired(err) ||
+		businessflow.IsCampaignBudgetOutOfRange(err) ||
+		businessflow.IsCampaignSexRequired(err) ||
+		businessflow.IsCampaignAdLinkRequired(err) ||
+		businessflow.IsCampaignCityRequired(err) ||
+		businessflow.IsCampaignTagsRequired(err) ||
+		businessflow.IsCampaignUUIDRequired(err) ||
+		businessflow.IsCampaignUpdateRequired(err) ||
+		businessflow.IsInvalidShortLinkDomain(err) ||
+		businessflow.IsAgencyCategoryJobRequired(err) {
+		return h.ErrorResponse(c, fiber.StatusBadRequest, "Campaign validation failed", "CAMPAIGN_VALIDATION_FAILED", nil)
+	}
+	if businessflow.IsScheduleTimeNotPresent(err) {
+		return h.ErrorResponse(c, fiber.StatusBadRequest, "Schedule time is required", "SCHEDULE_TIME_REQUIRED", nil)
+	}
+	if businessflow.IsScheduleTimeTooSoon(err) {
+		return h.ErrorResponse(c, fiber.StatusBadRequest, "Schedule time must be at least 10 minutes in the future", "SCHEDULE_TIME_TOO_SOON", nil)
+	}
+	if businessflow.IsScheduleTimeOutsideWindow(err) {
+		return h.ErrorResponse(c, fiber.StatusBadRequest, "Schedule time must be between 08:00 and 21:00 Asia/Tehran", "SCHEDULE_TIME_OUTSIDE_WINDOW", nil)
+	}
+	if businessflow.IsCampaignRescheduleNotAllowed(err) {
+		return h.ErrorResponse(c, fiber.StatusConflict, "Campaign cannot be rescheduled in current status", "CAMPAIGN_RESCHEDULE_NOT_ALLOWED", nil)
+	}
+	if businessflow.IsPlatformBasePriceNotFound(err) {
+		return h.ErrorResponse(c, fiber.StatusBadRequest, "Platform base price not found", "PLATFORM_BASE_PRICE_NOT_FOUND", nil)
+	}
+	if businessflow.IsPagePriceNotFound(err) {
+		return h.ErrorResponse(c, fiber.StatusBadRequest, "Page price not found", "PAGE_PRICE_NOT_FOUND", nil)
+	}
+
+	if businessErr != nil && businessErr.Code != "" {
+		message := defaultMessage
+		if businessErr.Message != "" {
+			message = businessErr.Message
+		}
+		return h.ErrorResponse(c, defaultStatus, message, businessErr.Code, nil)
+	}
+	return h.ErrorResponse(c, defaultStatus, defaultMessage, defaultCode, nil)
+}
