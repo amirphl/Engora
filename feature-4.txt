@@ -1,0 +1,476 @@
+# Frontend Task — Feature 4: Smart Targeting Test and Execution Phases
+
+## Terminology
+
+Use consistently:
+
+* `کمپین` → **Bundle**
+* `ارسال` → **Campaign**
+
+Reuse the existing Smart Targeting functionality from Features 2 and 3. Do not duplicate tag selection or exact-capacity logic.
+
+---
+
+# Objective
+
+Adapt Smart Targeting Campaign creation according to the selected phase:
+
+1. **Test**
+2. **Execution**
+
+The frontend must support the new Test-phase sampling configuration and preview API, while preserving the existing Execution-phase flow with the required Smart Targeting behavior.
+
+---
+
+# Test Phase
+
+## Sample Size per Tag
+
+When:
+
+* Targeting mode = **Smart Targeting**
+* Phase = **Test**
+
+display a mandatory numeric field:
+
+**Sample Size per Tag**
+
+Backend field:
+
+`sample_size_per_tag`
+
+Default:
+
+`10000`
+
+Requirements:
+
+* Required for Smart Targeting Test Campaigns.
+* Must be a positive integer.
+* No additional minimum threshold is required.
+* Persist the value as part of the Campaign/Smart Targeting configuration according to the backend DTO.
+* Do not trigger audience calculation simply because this value changes.
+
+The existing Campaign `num_audience` field must not be used as the effective audience count in this mode.
+
+---
+
+# Selected Tag Order
+
+The order of selected tags is significant in Test phase.
+
+The backend preview API and scheduler process tags sequentially, so the frontend must preserve the selected tags in the exact current table order.
+
+For example, if the table is currently sorted by:
+
+* Bundle Persona Fit Score
+* Tag Capacity
+* Default ordering
+* Another supported sort
+
+the selected tags must be submitted in that same relative order.
+
+Do not submit selected tag IDs as an unordered set when calling the Test sampling preview API.
+
+The frontend must maintain a deterministic ordered representation such as:
+
+`ordered_selected_tag_ids`
+
+or the equivalent backend DTO field.
+
+Changing the active tag sort changes the effective Test sampling order and therefore invalidates any previous Test sampling preview result.
+
+---
+
+# Test Audience Count
+
+The theoretical requested Test audience count is:
+
+```text
+selected_tag_count × sample_size_per_tag
+```
+
+Example:
+
+```text
+20 selected tags × 600 = 12,000 audiences
+```
+
+This is the requested maximum before determining whether every tag can actually satisfy the requested sample.
+
+Display this value clearly.
+
+Suggested label:
+
+**Requested Test Audience**
+
+However, the actual effective Test audience count must come from the preview API:
+
+```text
+satisfied_tag_count × sample_size_per_tag
+```
+
+because tags that cannot provide the full requested sample are skipped.
+
+Example:
+
+```text
+20 selected tags
+600 audiences per tag
+17 satisfied tags
+
+Requested Test Audience: 12,000
+Effective Test Audience: 10,200
+```
+
+Do not assume all selected tags will succeed.
+
+---
+
+# Test Sampling Preview API
+
+Provide a frontend action to call the new backend Test sampling preview API.
+
+Suggested button:
+
+**Check Test Sample Availability**
+
+The API only evaluates availability. It does not persist or reserve individual audiences.
+
+The request must use the current:
+
+* Campaign ID
+* Ordered selected tags
+* `sample_size_per_tag`
+* Selected score classes
+* Other required Smart Targeting identifiers according to the backend DTO
+
+Do not perform audience sampling or eligibility calculations in the frontend.
+
+---
+
+# Test Preview Result
+
+Display at least:
+
+* Number of selected tags
+* `sample_size_per_tag`
+* Requested Test audience count
+* Number of satisfied tags
+* Number of unsatisfied tags
+* Effective Test audience count
+* Campaign cost for the effective audience count
+* Satisfied tags
+* Unsatisfied tags
+
+If the backend provides available audience counts for unsuccessful tags, display them as well.
+
+Example:
+
+```text
+Selected Tags: 20
+Sample Size per Tag: 600
+Requested Test Audience: 12,000
+Satisfied Tags: 17
+Unsatisfied Tags: 3
+Effective Test Audience: 10,200
+Estimated Campaign Cost: ...
+```
+
+For unsatisfied tags, show a clear warning such as:
+
+**The following tags do not currently have enough eligible audiences to provide the requested sample and will be skipped.**
+
+Do not treat an unsatisfied tag as partially successful.
+
+---
+
+# Important Preview Limitation
+
+The preview result is not a reservation or guarantee.
+
+Other approved Campaigns in the same Bundle may consume audiences before scheduler runtime, and their exact future audience IDs are not known during preview.
+
+Therefore, clearly communicate that the preview is an estimate based on current availability.
+
+Suggested helper text:
+
+**This preview reflects current audience availability. Final Test audience selection is performed at scheduler runtime and may differ if availability changes.**
+
+Do not imply that previewed audiences are reserved.
+
+---
+
+# Test Phase — Step 3
+
+When Smart Targeting + Test phase is active:
+
+* The existing Campaign `num_audience` control must not determine the final audience count.
+* Audience count must not be manually editable.
+* Budget/count controls that would independently change the Campaign audience count must be disabled or read-only as appropriate.
+* Display the effective audience count from the latest valid preview.
+* Campaign cost should use the backend-provided preview cost/result.
+
+Suggested helper text:
+
+**In Smart Targeting Test phase, audience count is determined by the sample size per tag and the tags that can satisfy that sample. Change the selected tags or Sample Size per Tag to change the audience count.**
+
+If no valid preview exists yet, Step 3 must not present an old audience count/cost as current.
+
+---
+
+# Test Preview Invalidation
+
+Invalidate the current Test preview when any effective input changes, including:
+
+* Selected tags
+* Selected-tag ordering
+* Tag-table sorting
+* `sample_size_per_tag`
+* Audience score classes
+* Relevant Feature 3 Smart Targeting configuration
+* Campaign phase
+* Campaign/Bundle context
+
+When invalidated:
+
+* Mark the preview as stale.
+* Do not continue displaying its effective audience count or cost as current.
+* Require the user to run the preview again.
+
+Suggested message:
+
+**The Smart Targeting Test configuration has changed. Check sample availability again to refresh the audience count and cost.**
+
+---
+
+# Scheduler Runtime — Frontend Expectations
+
+The frontend does not select or persist individual audiences.
+
+At scheduler runtime, the backend will:
+
+* Process tags in the preserved order.
+* Randomly sample within each tag.
+* Require the full `sample_size_per_tag` for a tag to succeed.
+* Skip insufficient tags.
+* Keep audiences unique across tags.
+* Store the selected audience-to-tag attribution.
+
+The frontend only needs to correctly persist and submit the configuration required for that behavior.
+
+Do not implement random audience sampling client-side.
+
+# Execution Phase
+
+When:
+
+* Targeting mode = **Smart Targeting**
+* Phase = **Execution**
+
+do not display:
+
+**Sample Size per Tag**
+
+The existing Step 3 behavior remains available:
+
+* User may determine audience count based on budget/desired count.
+* Existing `num_audience` behavior remains applicable.
+* Requested audience count must not exceed the valid exact Smart Targeting capacity from Feature 3.
+
+If exceeded, display:
+
+**The requested audience count exceeds the exact usable capacity.**
+
+---
+
+# Execution Audience Selection
+
+The frontend does not implement audience ordering.
+
+The scheduler will:
+
+1. Apply the existing Smart Targeting filters.
+2. Sort eligible audiences by audience score descending.
+3. Select higher-scoring audiences first.
+
+No random selection is used for Smart Targeting Execution phase.
+
+The frontend should not reproduce this sorting logic locally.
+
+---
+
+# Phase Switching
+
+Switching between Test and Execution must correctly update the form.
+
+## Test → Execution
+
+* Hide `sample_size_per_tag`.
+* Stop using Test preview count/cost.
+* Restore normal Execution Step 3 audience/budget behavior.
+* Require the valid Feature 3 exact capacity where applicable.
+
+## Execution → Test
+
+* Show `sample_size_per_tag`.
+* Ignore `num_audience` as the effective Test audience count.
+* Require a fresh Test sampling preview before using Test audience count/cost.
+
+Do not reuse a preview/result from another phase.
+
+---
+
+# State Management
+
+Maintain the required state for:
+
+* Phase type
+* `sample_size_per_tag`
+* Ordered selected tag IDs
+* Selected score classes
+* Test preview loading/status
+* Requested Test audience count
+* Satisfied tags
+* Unsatisfied tags
+* Effective Test audience count
+* Preview Campaign cost
+* Preview validity/staleness
+* Feature 3 exact-capacity state
+* Execution requested audience count
+
+Selected tag ordering must remain consistent with the active Feature 2 table sorting.
+
+Avoid losing or reordering selected tags accidentally during:
+
+* Pagination
+* Search
+* Sorting
+* Refetches
+* Campaign creation step navigation
+
+---
+
+# API Safety
+
+Use the standard authenticated API client and attach the correct access token.
+
+For the Test preview API:
+
+* Prevent duplicate submissions.
+* Cancel or ignore stale requests.
+* Ensure an old response cannot overwrite a newer configuration.
+* Bind responses to the correct Campaign and exact request inputs.
+* Preserve current form state on recoverable errors.
+* Do not clear selected tags or `sample_size_per_tag` after API failure.
+
+A useful approach is to associate each preview with a deterministic frontend request fingerprint based on:
+
+* Campaign
+* Ordered selected tags
+* Score classes
+* `sample_size_per_tag`
+
+and reject stale results.
+
+---
+
+# DTO Requirements
+
+Review all changed/new DTOs carefully.
+
+Potential fields include:
+
+* `sample_size_per_tag`
+* `ordered_selected_tag_ids`
+* `selected_score_classes`
+* `requested_test_audience_count`
+* `satisfied_tag_count`
+* `unsatisfied_tag_count`
+* `effective_test_audience_count`
+* `satisfied_tags`
+* `unsatisfied_tags`
+* `calculated_cost`
+* `preview_status`
+* `preview_valid`
+* Any backend-provided sort/order representation
+
+Use the final backend names exactly.
+
+Do not confuse:
+
+* Requested Test audience count
+* Effective Test audience count
+* Existing Campaign `num_audience`
+* Feature 3 exact usable capacity
+
+They have different meanings.
+
+---
+
+# Required Translations
+
+Provide Persian and English translations for at least:
+
+| English                                                                       | Persian                                                        |
+| ----------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| Sample Size per Tag                                                           | مقدار نمونه هر تگ                                              |
+| Requested Test Audience                                                       | تعداد مخاطبان درخواستی تست                                     |
+| Effective Test Audience                                                       | تعداد مؤثر مخاطبان تست                                         |
+| Check Test Sample Availability                                                | بررسی ظرفیت نمونه تست                                          |
+| Satisfied Tags                                                                | تگ‌های دارای ظرفیت کافی                                        |
+| Unsatisfied Tags                                                              | تگ‌های فاقد ظرفیت کافی                                         |
+| Estimated Campaign Cost                                                       | هزینه برآوردی کمپین                                            |
+| Test sample preview is outdated.                                              | پیش‌نمایش نمونه تست دیگر معتبر نیست.                           |
+| Check sample availability again.                                              | ظرفیت نمونه را دوباره بررسی کنید.                              |
+| The following tags do not have enough eligible audiences and will be skipped. | تگ‌های زیر مخاطب واجد شرایط کافی ندارند و رد می‌شوند.          |
+| The requested audience count exceeds the exact usable capacity.               | تعداد مخاطبان انتخاب‌شده بیشتر از ظرفیت دقیق قابل استفاده است. |
+
+Also translate backend/API errors and provide a generic localized fallback.
+
+---
+
+# Error Handling
+
+Handle:
+
+* Missing `sample_size_per_tag`
+* Invalid/zero/negative sample size
+* No selected tags
+* Missing or stale exact-capacity configuration
+* Preview calculation failure
+* Cost calculation failure
+* Campaign/Bundle not found
+* Unauthorized/forbidden responses
+* Invalid ordered tag list
+* Stale preview response
+* Network/timeout failure
+* Unknown backend errors
+
+Do not display raw backend exceptions.
+
+---
+
+# Acceptance Criteria
+
+The frontend implementation is complete when:
+
+* `sample_size_per_tag` is mandatory for Smart Targeting Test Campaigns.
+* It defaults to `10,000`.
+* `num_audience` does not control Test audience size.
+* Selected tags are preserved in their active table order.
+* The Test preview API receives the ordered selected tags and current sampling configuration.
+* Requested Test audience count is shown as `selected tags × sample_size_per_tag`.
+* Effective Test audience count comes from satisfied tags returned by the backend.
+* Satisfied and unsatisfied tags are shown.
+* Unsatisfied tags are treated as skipped, not partially sampled.
+* Backend-provided Test Campaign cost is displayed.
+* Preview results clearly indicate that runtime availability can change.
+* Step 3 audience/budget controls are locked appropriately in Test phase.
+* Any relevant configuration change invalidates the Test preview.
+* Execution phase does not show `sample_size_per_tag`.
+* Execution Step 3 continues using the normal audience-count/budget flow.
+* Execution count cannot exceed Feature 3 exact usable capacity.
+* DTO changes are fully implemented.
+* API requests are authenticated and race-safe.
+* Existing Feature 2, Feature 3, Campaign creation, reports, Bundle modules, and refund-related UI remain intact.
