@@ -161,6 +161,7 @@ export interface AdminGetCampaignResponse {
   bundle_id?: number | null;
   bundle_title?: string | null;
   phase?: string | null;
+  sample_size_per_tag?: number | null;
 }
 
 export interface AdminPaginationInfo {
@@ -327,6 +328,7 @@ export interface AdminCustomerCampaignItem {
   customer_full_name?: string | null;
   agency_full_name?: string | null;
   target_audience_excel_file_uuid?: string | null;
+  sample_size_per_tag?: number | null;
 }
 
 export interface AdminCustomerWithCampaignsResponse {
