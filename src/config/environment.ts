@@ -42,6 +42,9 @@ export interface EnvironmentConfig {
       smartTargetingTags: string;
       smartTargetingSelection: string;
       smartTargetingAutoSelect: string;
+      smartTargetingCapacityCalculations: string;
+      smartTargetingCapacityCalculationById: string;
+      smartTargetingTestSamplingPreview: string;
     };
     bundles: {
       list: string;
@@ -149,6 +152,12 @@ const localConfig: EnvironmentConfig = {
       smartTargetingSelection: '/campaigns/:uuid/smart-targeting/selection',
       smartTargetingAutoSelect:
         '/campaigns/:uuid/smart-targeting/selection/auto',
+      smartTargetingCapacityCalculations:
+        '/campaigns/:uuid/smart-targeting/capacity-calculations',
+      smartTargetingCapacityCalculationById:
+        '/campaigns/:uuid/smart-targeting/capacity-calculations/:calculation_id',
+      smartTargetingTestSamplingPreview:
+        '/campaigns/:uuid/smart-targeting/test-sampling-preview',
     },
     bundles: {
       list: '/bundles',
