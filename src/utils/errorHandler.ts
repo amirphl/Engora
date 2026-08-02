@@ -246,6 +246,86 @@ export const ERROR_MESSAGES: Record<string, ErrorMessage> = {
     en: 'Failed to automatically select Smart Targeting tags. Please try again',
     fa: 'انتخاب خودکار برچسب‌های هدف‌گیری هوشمند ناموفق بود. لطفاً دوباره تلاش کنید',
   },
+  SMART_TARGETING_SCORE_CLASSES_INVALID: {
+    en: 'One or more selected audience score classes are invalid',
+    fa: 'یک یا چند کلاس نمره مخاطب انتخاب‌شده نامعتبر است',
+  },
+  SMART_TARGETING_CAPACITY_UNAVAILABLE: {
+    en: 'Exact capacity calculation is currently unavailable',
+    fa: 'محاسبه ظرفیت دقیق در حال حاضر در دسترس نیست',
+  },
+  SMART_TARGETING_CAPACITY_REQUEST_FAILED: {
+    en: 'Failed to request the exact-capacity calculation. Please try again',
+    fa: 'ثبت درخواست محاسبه ظرفیت دقیق ناموفق بود. لطفاً دوباره تلاش کنید',
+  },
+  SMART_TARGETING_CAPACITY_LOOKUP_FAILED: {
+    en: 'Failed to load the exact-capacity calculation. Please try again',
+    fa: 'بارگذاری محاسبه ظرفیت دقیق ناموفق بود. لطفاً دوباره تلاش کنید',
+  },
+  SMART_TARGETING_CAPACITY_CALCULATION_NOT_FOUND: {
+    en: 'The exact-capacity calculation could not be found',
+    fa: 'محاسبه ظرفیت دقیق موردنظر یافت نشد',
+  },
+  SMART_TARGETING_CAPACITY_CALCULATION_ACTIVE: {
+    en: 'An exact-capacity calculation is already in progress',
+    fa: 'یک محاسبه ظرفیت دقیق هم‌اکنون در حال انجام است',
+  },
+  INVALID_STATE: {
+    en: 'Another request is already in progress',
+    fa: 'درخواست دیگری هم‌اکنون در حال پردازش است',
+  },
+  SMART_TARGETING_CAPACITY_PENDING: {
+    en: 'Exact Smart Targeting capacity is being calculated. Please wait and try again',
+    fa: 'ظرفیت دقیق هدف‌گیری هوشمند در حال محاسبه است. لطفاً منتظر بمانید و دوباره تلاش کنید',
+  },
+  SMART_TARGETING_EXACT_CAPACITY_REQUIRED: {
+    en: 'Recalculate the current exact Smart Targeting capacity before proceeding',
+    fa: 'پیش از ادامه، ظرفیت دقیق فعلی هدف‌گیری هوشمند را دوباره محاسبه کنید',
+  },
+  SMART_TARGETING_CAPACITY_RECALCULATION_REQUIRED: {
+    en: 'This capacity result is no longer valid. Recalculate it',
+    fa: 'این نتیجه ظرفیت دیگر معتبر نیست. آن را دوباره محاسبه کنید',
+  },
+  SMART_TARGETING_CAPACITY_FAILED: {
+    en: 'Exact-capacity calculation failed. Please try again',
+    fa: 'محاسبه ظرفیت دقیق با خطا مواجه شد. لطفاً دوباره تلاش کنید',
+  },
+  SMART_TARGETING_APPROVED_ALLOCATION_FAILED: {
+    en: 'Approved Campaign allocations could not be applied to the capacity',
+    fa: 'اعمال تخصیص ارسال‌های تأییدشده بر ظرفیت ناموفق بود',
+  },
+  SMART_TARGETING_SAMPLE_SIZE_REQUIRED: {
+    en: 'Sample Size per Tag is required for Smart Targeting Test campaigns',
+    fa: 'اندازه نمونه برای هر برچسب در ارسال تست هدف‌گیری هوشمند الزامی است',
+  },
+  SMART_TARGETING_SAMPLE_SIZE_INVALID: {
+    en: 'Sample Size per Tag must be a positive whole number',
+    fa: 'اندازه نمونه برای هر برچسب باید یک عدد صحیح مثبت باشد',
+  },
+  SMART_TARGETING_TEST_PREVIEW_REQUIRED: {
+    en: 'A current Smart Targeting Test sample preview is required',
+    fa: 'پیش‌نمایش فعلی نمونه تست هدف‌گیری هوشمند الزامی است',
+  },
+  SMART_TARGETING_TEST_NO_SATISFIED_TAGS: {
+    en: 'No selected tag can currently provide the full requested Test sample',
+    fa: 'هیچ‌یک از برچسب‌های انتخاب‌شده اکنون نمی‌تواند کل نمونه تست درخواستی را تأمین کند',
+  },
+  SMART_TARGETING_TEST_AUDIENCE_COUNT_OVERFLOW: {
+    en: 'The requested Smart Targeting Test audience count is too large',
+    fa: 'تعداد مخاطبان درخواستی تست هدف‌گیری هوشمند بیش از حد مجاز است',
+  },
+  SMART_TARGETING_TEST_PREVIEW_FAILED: {
+    en: 'Failed to check Smart Targeting Test sample availability',
+    fa: 'بررسی موجودی نمونه تست هدف‌گیری هوشمند ناموفق بود',
+  },
+  CAMPAIGN_COST_OVERFLOW: {
+    en: 'The calculated campaign cost exceeds the supported range',
+    fa: 'هزینه محاسبه‌شده ارسال بیش از محدوده پشتیبانی‌شده است',
+  },
+  INVALID_CALCULATION_ID: {
+    en: 'The capacity calculation ID is invalid',
+    fa: 'شناسه محاسبه ظرفیت نامعتبر است',
+  },
 
   // Bundle errors
   INVALID_BUNDLE_ID: {
@@ -364,7 +444,7 @@ export const ERROR_MESSAGES: Record<string, ErrorMessage> = {
   },
   TIMEOUT_ERROR: {
     en: 'Request timed out. Please try again',
-    fa: 'درخواست زمان‌بندی شد. لطفاً دوباره تلاش کنید',
+    fa: 'مهلت درخواست به پایان رسید. لطفاً دوباره تلاش کنید',
   },
   RATE_LIMIT_EXCEEDED: {
     en: 'Too many requests. Please wait a moment and try again',
