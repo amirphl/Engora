@@ -11,6 +11,7 @@ import {
 } from '../types/campaign';
 import { clearLevelSelection, saveLevelSelection } from '../types/segment';
 import { normalizeLinkPlaceholder } from './campaignUtils';
+import { DEFAULT_SMART_TARGETING_TEST_SAMPLE_SIZE } from './smartTargetingTestPreview';
 
 export interface SmartTargetingDraftSelection {
   selectedTagIds: number[];
@@ -107,6 +108,17 @@ export const createCampaignCreationDraft = (overrides?: {
       selectedTagIds: [],
       smartTargetingSelectedRawCapacity: 0,
       smartTargetingSelectionDirty: false,
+      smartTargetingScoreClasses: [],
+      smartTargetingScoreClassesDirty: false,
+      smartTargetingCapacityCalculation: null,
+      smartTargetingExactCapacityRequired: false,
+      smartTargetingSortBy: '',
+      smartTargetingSortDirection: 'desc',
+      smartTargetingSelectionOrderPending: false,
+      sampleSizePerTag: DEFAULT_SMART_TARGETING_TEST_SAMPLE_SIZE,
+      smartTargetingTestPreview: null,
+      smartTargetingTestPreviewInputKey: null,
+      smartTargetingTestPreviewStale: false,
       capacityTooLow: false,
       capacity: undefined,
       audienceGrades: [],
@@ -159,6 +171,8 @@ export const normalizeCampaignResponseToDraft = (
     campaign,
     selectedTagIds
   );
+  const isSmartTargetingTest =
+    audienceTargetingMethod === 'smart_targeting' && campaign.phase === 'test';
   const platform = normalizePlatform(campaign.platform);
   const responseCapacity =
     typeof campaign.num_audience === 'number' &&
@@ -211,6 +225,24 @@ export const normalizeCampaignResponseToDraft = (
       smartTargetingSelectedRawCapacity: selectedRawCapacity,
       smartTargetingSelectionDirty:
         options?.smartTargetingSelectionDirty === true,
+      smartTargetingScoreClasses: normalizeAudienceGrades(
+        campaign.selected_score_classes ??
+          (audienceTargetingMethod === 'smart_targeting'
+            ? campaign.audience_grades
+            : undefined)
+      ),
+      smartTargetingScoreClassesDirty: false,
+      smartTargetingCapacityCalculation: null,
+      smartTargetingExactCapacityRequired: false,
+      sampleSizePerTag:
+        typeof campaign.sample_size_per_tag === 'number' &&
+        Number.isSafeInteger(campaign.sample_size_per_tag) &&
+        campaign.sample_size_per_tag > 0
+          ? campaign.sample_size_per_tag
+          : DEFAULT_SMART_TARGETING_TEST_SAMPLE_SIZE,
+      smartTargetingTestPreview: null,
+      smartTargetingTestPreviewInputKey: null,
+      smartTargetingTestPreviewStale: false,
       capacity,
       capacityTooLow:
         audienceTargetingMethod !== 'excel' &&
@@ -254,11 +286,13 @@ export const normalizeCampaignResponseToDraft = (
           : null,
     },
     budget: {
-      totalBudget:
-        typeof campaign.budget === 'number' && Number.isFinite(campaign.budget)
+      totalBudget: isSmartTargetingTest
+        ? 0
+        : typeof campaign.budget === 'number' &&
+            Number.isFinite(campaign.budget)
           ? Math.max(0, campaign.budget)
           : 0,
-      estimatedMessages: responseCapacity,
+      estimatedMessages: isSmartTargetingTest ? undefined : responseCapacity,
     },
     payment: {
       paymentMethod: '',
@@ -285,6 +319,7 @@ const persistCampaignCreationDraft = (draft: CampaignData) => {
     selectedTagIds: draft.segment.selectedTagIds ?? [],
     smartTargetingSelectedRawCapacity:
       draft.segment.smartTargetingSelectedRawCapacity ?? 0,
+    smartTargetingScoreClasses: draft.segment.smartTargetingScoreClasses ?? [],
     metadata: {},
     tags: draft.segment.tags || [],
     count: draft.segment.capacity || 0,
