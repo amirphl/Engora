@@ -141,7 +141,55 @@ describe('campaignUtils API serialization', () => {
     expect(payload.level2s).toEqual(['Retail']);
     expect(payload.level3s).toEqual(['Online']);
     expect(payload.tags).toEqual(['buyer']);
-    expect(payload.audience_grades).toBeUndefined();
+    expect(payload.audience_grades).toEqual([]);
+  });
+
+  it('persists Smart Targeting score classes as campaign audience grades', () => {
+    const base = campaignData();
+    const payload = serializeCampaignPayload({
+      ...base,
+      segment: {
+        ...base.segment,
+        audienceTargetingMethod: 'smart_targeting',
+        selectedTagIds: [2],
+        smartTargetingScoreClasses: ['C', 'A'],
+        audienceGrades: ['B'],
+      },
+    });
+
+    expect(payload.audience_grades).toEqual(['C', 'A']);
+  });
+
+  it('serializes Test sample size and preserves ordered Smart Targeting tags', () => {
+    const base = campaignData();
+    const payload = serializeCampaignPayload({
+      ...base,
+      segment: {
+        ...base.segment,
+        audienceTargetingMethod: 'smart_targeting',
+        phase: 'test',
+        selectedTagIds: [30, 10, 20],
+        sampleSizePerTag: 600,
+      },
+    });
+
+    expect(payload.selected_tag_ids).toEqual([30, 10, 20]);
+    expect(payload.sample_size_per_tag).toBe(600);
+  });
+
+  it('omits Test-only sample size for Smart Targeting Execution', () => {
+    const base = campaignData();
+    const payload = serializeCampaignPayload({
+      ...base,
+      segment: {
+        ...base.segment,
+        audienceTargetingMethod: 'smart_targeting',
+        phase: 'execution',
+        sampleSizePerTag: 600,
+      },
+    });
+
+    expect(payload.sample_size_per_tag).toBeUndefined();
   });
 
   it('serializes disabled link and schedule state with backend clear semantics', () => {
