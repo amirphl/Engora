@@ -35,6 +35,7 @@ const response: GetCampaignResponse = {
   audience_grades: ['A', 'B'],
   bundle_id: 12,
   phase: 'test',
+  sample_size_per_tag: 600,
 };
 
 describe('campaign creation draft normalization', () => {
@@ -60,6 +61,7 @@ describe('campaign creation draft normalization', () => {
       audienceTargetingMethod: 'smart_targeting',
       selectedTagIds: [3, 4],
       smartTargetingSelectedRawCapacity: 750,
+      smartTargetingScoreClasses: ['A', 'B'],
       audienceGrades: ['A', 'B'],
       sex: 'all',
       city: ['Tehran', 'Shiraz'],
@@ -67,6 +69,7 @@ describe('campaign creation draft normalization', () => {
       job: 'Engineer',
       bundleId: 12,
       phase: 'test',
+      sampleSizePerTag: 600,
     });
     expect(draft.content).toMatchObject({
       insertLink: true,
@@ -78,7 +81,10 @@ describe('campaign creation draft normalization', () => {
       platformSettingsId: 9,
       mediaUuid: '6ba7b811-9dad-41d1-80b4-00c04fd430c8',
     });
-    expect(draft.budget.totalBudget).toBe(250000);
+    // Test previews are estimates and are deliberately not restored, so their
+    // derived cost must not be restored either.
+    expect(draft.budget.totalBudget).toBe(0);
+    expect(draft.budget.estimatedMessages).toBeUndefined();
     expect(draft.payment.finalCost).toBeUndefined();
   });
 
