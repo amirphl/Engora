@@ -330,6 +330,8 @@ export const serializeCampaignPayload = (
     campaignData.segment.audienceTargetingMethod ??
     (targetAudienceExcelFileUuid != null ? 'excel' : 'standard');
   const isSmartTargeting = audienceTargetingMethod === 'smart_targeting';
+  const isSmartTargetingTest =
+    isSmartTargeting && campaignData.segment.phase === 'test';
 
   const normalizedTargetAudienceExcelFileUuid =
     typeof targetAudienceExcelFileUuid === 'string' &&
@@ -395,6 +397,9 @@ export const serializeCampaignPayload = (
       platform === 'sms' ? null : (campaignData.content.mediaUuid ?? null),
     bundle_id: campaignData.segment.bundleId ?? null,
     phase: campaignData.segment.phase || undefined,
+    sample_size_per_tag: isSmartTargetingTest
+      ? campaignData.segment.sampleSizePerTag
+      : undefined,
   };
 
   if (options?.includeContent) {
@@ -412,7 +417,15 @@ export const serializeCampaignPayload = (
     payload.finalize = options.finalize;
   }
 
-  if (
+  if (isSmartTargeting) {
+    payload.audience_grades = Array.from(
+      new Set(
+        (campaignData.segment.smartTargetingScoreClasses || []).filter(
+          grade => grade === 'A' || grade === 'B' || grade === 'C'
+        )
+      )
+    );
+  } else if (
     campaignData.segment.audienceGrades &&
     campaignData.segment.audienceGrades.length > 0
   ) {
