@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
 import { Image as ImageIcon } from 'lucide-react';
 import Card from '../../ui/Card';
 import Button from '../../ui/Button';
@@ -86,6 +86,7 @@ const MessageMediaCard: React.FC<MessageMediaCardProps> = ({
     [maxCharactersLabel, remaining]
   );
   const hasLinkMarker = hasLinkPlaceholder(text || '');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleTextChange = (value: string) => {
     const nextValue =
@@ -98,22 +99,29 @@ const MessageMediaCard: React.FC<MessageMediaCardProps> = ({
     if (!file) return;
     if (!ACCEPTED_TYPES.includes(file.type)) {
       onMediaError?.('Invalid file type');
+      event.target.value = '';
       return;
     }
     if (file.size > MAX_MEDIA_BYTES) {
       onMediaError?.('File is too large (max 100MB)');
+      event.target.value = '';
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = typeof reader.result === 'string' ? reader.result : '';
-      const type: CampaignMediaType = file.type.startsWith('image/')
-        ? 'image'
-        : 'video';
-      onMediaChange({ file, previewUrl: result, type, name: file.name });
-    };
-    reader.readAsDataURL(file);
+    const type: CampaignMediaType = file.type.startsWith('image/')
+      ? 'image'
+      : 'video';
+    onMediaChange({
+      file,
+      previewUrl: URL.createObjectURL(file),
+      type,
+      name: file.name,
+    });
+  };
+
+  const handleMediaClear = () => {
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    onMediaClear();
   };
 
   return (
@@ -164,6 +172,7 @@ const MessageMediaCard: React.FC<MessageMediaCardProps> = ({
             {mediaLabel}
           </label>
           <input
+            ref={fileInputRef}
             type='file'
             accept='image/jpeg,image/png,image/gif,image/webp,video/mp4,video/quicktime,video/webm,video/x-matroska'
             onChange={handleMediaChange}
@@ -191,7 +200,7 @@ const MessageMediaCard: React.FC<MessageMediaCardProps> = ({
                 )}
                 <button
                   type='button'
-                  onClick={onMediaClear}
+                  onClick={handleMediaClear}
                   className='text-sm text-red-600 hover:text-red-700'
                 >
                   {removeLabel}

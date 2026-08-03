@@ -1,13 +1,29 @@
 import { useState, useEffect } from 'react';
+import {
+  isScheduleWithinTehranWindow,
+  MIN_SCHEDULE_LEAD_TIME_MS,
+} from '../../../utils/campaignUtils';
+
+const getDefaultSchedule = (): string => {
+  const targetMs = Date.now() + MIN_SCHEDULE_LEAD_TIME_MS + 60 * 1000;
+  let candidateMs = Math.ceil(targetMs / 60000) * 60000;
+
+  for (let offset = 0; offset <= 24 * 60; offset += 1) {
+    const candidate = new Date(candidateMs);
+    if (isScheduleWithinTehranWindow(candidate)) {
+      return candidate.toISOString();
+    }
+    candidateMs += 60 * 1000;
+  }
+
+  return new Date(candidateMs).toISOString();
+};
 
 export const useScheduleTime = (scheduleAt?: string) => {
   const [showDateTimePicker, setShowDateTimePicker] = useState(false);
 
-  // Initialize showDateTimePicker based on existing scheduleAt value
   useEffect(() => {
-    if (scheduleAt) {
-      setShowDateTimePicker(true);
-    }
+    setShowDateTimePicker(Boolean(scheduleAt));
   }, [scheduleAt]);
 
   const toggleDateTimePicker = (
@@ -17,11 +33,7 @@ export const useScheduleTime = (scheduleAt?: string) => {
     setShowDateTimePicker(newShow);
 
     if (newShow) {
-      // Set default schedule to now + 20 minutes
-      const now = new Date();
-      const plus20 = new Date(now.getTime() + 20 * 60 * 1000);
-      plus20.setSeconds(0, 0);
-      onScheduleChange(plus20.toISOString());
+      onScheduleChange(getDefaultSchedule());
     } else {
       // Clear schedule when disabling
       onScheduleChange(undefined);
@@ -34,10 +46,7 @@ export const useScheduleTime = (scheduleAt?: string) => {
   ) => {
     setShowDateTimePicker(show);
     if (show) {
-      const now = new Date();
-      const plus20 = new Date(now.getTime() + 20 * 60 * 1000);
-      plus20.setSeconds(0, 0);
-      onScheduleChange(plus20.toISOString());
+      onScheduleChange(getDefaultSchedule());
     } else {
       onScheduleChange(undefined);
     }
@@ -47,10 +56,14 @@ export const useScheduleTime = (scheduleAt?: string) => {
     if (!scheduleAt) return true;
 
     const nowMs = Date.now();
-    const minMs = nowMs + 20 * 60 * 1000;
+    const minMs = nowMs + MIN_SCHEDULE_LEAD_TIME_MS;
     const schedMs = new Date(scheduleAt).getTime();
 
-    return !Number.isNaN(schedMs) && schedMs >= minMs;
+    return (
+      !Number.isNaN(schedMs) &&
+      schedMs >= minMs &&
+      isScheduleWithinTehranWindow(scheduleAt)
+    );
   };
 
   return {

@@ -1,11 +1,12 @@
 import React from 'react';
 import Card from '../../ui/Card';
 import FormField from '../../ui/FormField';
-import { DEFAULT_SHORT_LINK_DOMAIN } from '../../../utils/campaignUtils';
+import { ALLOWED_SHORT_LINK_DOMAINS } from '../../../utils/campaignUtils';
 
-const AVAILABLE_DOMAINS = [
-  { value: DEFAULT_SHORT_LINK_DOMAIN, label: DEFAULT_SHORT_LINK_DOMAIN },
-];
+const AVAILABLE_DOMAINS = ALLOWED_SHORT_LINK_DOMAINS.map(domain => ({
+  value: domain,
+  label: domain,
+}));
 
 interface ShortLinkDomainCardProps {
   value: string | null;

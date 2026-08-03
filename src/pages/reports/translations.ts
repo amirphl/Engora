@@ -16,6 +16,7 @@ export interface ReportsTranslations {
   orderBy: string;
   startDatePlaceholder: string;
   endDatePlaceholder: string;
+  loadMore: string;
   noMore: string;
   loading: string;
   invalidDateRange: string;
@@ -138,7 +139,10 @@ export interface ReportsTranslations {
     segmentationSection: string;
     segmentationMethod: string;
     segmentationMethodLevels: string;
+    segmentationMethodSmartTargeting: string;
     segmentationMethodExcelFile: string;
+    selectedTagCount: string;
+    selectedRawCapacity: string;
     audienceGrades: string;
     excelFileUuid: string;
     platformSection: string;
@@ -230,6 +234,7 @@ export const reportsTranslations: Record<'en' | 'fa', ReportsTranslations> = {
     orderBy: 'Order By',
     startDatePlaceholder: 'Select start date',
     endDatePlaceholder: 'Select end date',
+    loadMore: 'Load more',
     noMore: 'No more campaigns',
     loading: 'Loading...',
     invalidDateRange: 'Start date must be earlier than end date.',
@@ -295,7 +300,7 @@ export const reportsTranslations: Record<'en' | 'fa', ReportsTranslations> = {
       lineNumber: 'Line Number/Service',
       platform: 'Platform',
       segment: 'Segment',
-      level3: 'Level3',
+      level3: 'Target Audience',
       aggregatedTotalSent: 'Aggregated Total Sent',
       clickRate: 'Click Rate',
       status: 'Status',
@@ -358,7 +363,10 @@ export const reportsTranslations: Record<'en' | 'fa', ReportsTranslations> = {
       segmentationSection: 'Segmentation Method',
       segmentationMethod: 'Method',
       segmentationMethodLevels: 'Levels',
+      segmentationMethodSmartTargeting: 'Smart Targeting',
       segmentationMethodExcelFile: 'Excel File',
+      selectedTagCount: 'Selected Tags',
+      selectedRawCapacity: 'Selected Raw Capacity',
       audienceGrades: 'Audience Grades',
       excelFileUuid: 'Excel File UUID',
       platformSection: 'Platform',
@@ -452,6 +460,7 @@ export const reportsTranslations: Record<'en' | 'fa', ReportsTranslations> = {
     orderBy: 'مرتب‌سازی',
     startDatePlaceholder: 'انتخاب تاریخ شروع',
     endDatePlaceholder: 'انتخاب تاریخ پایان',
+    loadMore: 'نمایش بیشتر',
     noMore: 'کمپین دیگری وجود ندارد',
     loading: 'در حال بارگذاری...',
     invalidDateRange: 'تاریخ شروع باید قبل از تاریخ پایان باشد.',
@@ -576,7 +585,10 @@ export const reportsTranslations: Record<'en' | 'fa', ReportsTranslations> = {
       segmentationSection: 'مخاطبان هدف',
       segmentationMethod: 'روش',
       segmentationMethodLevels: 'دسته‌بندی عادی',
+      segmentationMethodSmartTargeting: 'هدف‌گیری هوشمند',
       segmentationMethodExcelFile: 'مخاطبان مشخص',
+      selectedTagCount: 'تعداد برچسب‌های انتخاب‌شده',
+      selectedRawCapacity: 'ظرفیت خام انتخاب‌شده',
       audienceGrades: 'کلاس امتیازی',
       excelFileUuid: 'شناسه فایل اکسل',
       platformSection: 'اطلاعات کانال ارسال',

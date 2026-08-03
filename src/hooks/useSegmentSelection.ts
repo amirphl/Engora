@@ -5,6 +5,7 @@ import {
   createEmptyLevelSelection,
   LEVEL_SELECTION_KEY,
 } from '../types/segment';
+import { isUuidV4, isValidCampaignStringArray } from '../utils/campaignUtils';
 
 /**
  * Custom hook to access the current level selection state from localStorage
@@ -16,12 +17,24 @@ export const useLevelSelection = () => {
   });
 
   const isTargetAudienceExcelFileMode =
-    selection.targetAudienceExcelFileUuid != null;
-  const excelFileUploaded =
-    typeof selection.targetAudienceExcelFileUuid === 'string' &&
-    selection.targetAudienceExcelFileUuid.trim().length > 0;
+    selection.audienceTargetingMethod === 'excel';
+  const isSmartTargetingMode =
+    selection.audienceTargetingMethod === 'smart_targeting';
+  const excelFileUploaded = isUuidV4(selection.targetAudienceExcelFileUuid);
   const hasLevelSelections =
-    selection.level1s.length > 0 && selection.level3s.length > 0;
+    isValidCampaignStringArray(selection.level1s, { required: true }) &&
+    isValidCampaignStringArray(selection.level2s, { required: true }) &&
+    isValidCampaignStringArray(selection.level3s, { required: true }) &&
+    isValidCampaignStringArray(selection.tags, { required: true });
+  const hasSmartTargetingSelection =
+    selection.selectedTagIds.length > 0 &&
+    selection.selectedTagIds.length <= 10000 &&
+    selection.selectedTagIds.every(
+      tagId => Number.isInteger(tagId) && tagId > 0
+    ) &&
+    new Set(selection.selectedTagIds).size ===
+      selection.selectedTagIds.length &&
+    selection.smartTargetingSelectedRawCapacity >= 500;
 
   useEffect(() => {
     // Listen for storage changes (e.g., from other tabs or components)
@@ -56,19 +69,30 @@ export const useLevelSelection = () => {
     level2s: selection.level2s,
     level3s: selection.level3s,
     targetAudienceExcelFileUuid: selection.targetAudienceExcelFileUuid,
+    audienceTargetingMethod: selection.audienceTargetingMethod,
+    selectedTagIds: selection.selectedTagIds,
+    smartTargetingSelectedRawCapacity:
+      selection.smartTargetingSelectedRawCapacity,
     metadata: selection.metadata,
     tags: selection.tags,
     count: selection.count,
     lastUpdated: selection.lastUpdated,
     isTargetAudienceExcelFileMode,
+    isSmartTargetingMode,
     excelFileUploaded,
     hasLevelSelections,
+    hasSmartTargetingSelection,
     // Checks
-    hasSelections: hasLevelSelections || isTargetAudienceExcelFileMode,
+    hasSelections:
+      (selection.audienceTargetingMethod === 'standard' &&
+        hasLevelSelections) ||
+      (isTargetAudienceExcelFileMode && excelFileUploaded) ||
+      (isSmartTargetingMode && hasSmartTargetingSelection),
     isEmpty:
       selection.level1s.length === 0 &&
       selection.level2s.length === 0 &&
       selection.level3s.length === 0 &&
-      selection.targetAudienceExcelFileUuid == null,
+      !excelFileUploaded &&
+      !hasSmartTargetingSelection,
   };
 };

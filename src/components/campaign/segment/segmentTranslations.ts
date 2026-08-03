@@ -108,6 +108,7 @@ const campaignLevelEn = {
   // Segmentation mode
   segmentationMode: 'Segmentation Method',
   segmentationByLevels: 'Select Levels',
+  segmentationBySmartTargeting: 'Smart Targeting',
   segmentationByTargetAudienceExcelFile: 'Upload Excel file',
   segmentationByTargetAudienceExcelFileTitle: 'Target Audience Excel File',
   segmentationByTargetAudienceExcelFileHelp:
@@ -121,6 +122,61 @@ const campaignLevelEn = {
     'Please upload a valid Excel file (.xls or .xlsx)',
   segmentationByTargetAudienceExcelFileRequired:
     'Please upload your Excel file',
+  smartTargeting: {
+    title: 'Smart Targeting Tags',
+    description:
+      'Select the campaign tags to target. Selections remain saved across search, sorting, and pagination.',
+    searchLabel: 'Search Tag Display Title',
+    searchPlaceholder: 'Search tags',
+    sortByLabel: 'Sort by',
+    sortDirectionLabel: 'Direction',
+    defaultOrder: 'Default order',
+    ascending: 'Ascending',
+    descending: 'Descending',
+    columns: {
+      selection: 'Selection',
+      tagDisplayTitle: 'Tag Display Title',
+      tagCapacity: 'Tag Capacity',
+      bundlePersonaFitScore: 'Bundle Persona Fit Score',
+      testPhaseAvgCtr: 'Test Phase Average CTR',
+      overallAvgCtr: 'Overall Average CTR',
+    },
+    sortOptions: {
+      tagCapacity: 'Tag Capacity',
+      bundlePersonaFitScore: 'Bundle Persona Fit Score',
+      testPhaseAvgCtr: 'Test Phase Average CTR',
+      overallAvgCtr: 'Overall Average CTR',
+    },
+    autoSelectLabel: 'Number of Tags for Automatic Selection',
+    autoSelectPlaceholder: 'Example: 20',
+    autoSelectButton: 'Automatically Select Tags',
+    autoSelecting: 'Selecting...',
+    selectedTags: 'Selected tags',
+    selectedRawCapacity: 'Selected raw capacity',
+    audiences: 'audiences',
+    loading: 'Loading Smart Targeting tags...',
+    refreshing: 'Refreshing...',
+    retry: 'Retry',
+    noBundle: 'Select a bundle before choosing Smart Targeting tags.',
+    noTags: 'No Smart Targeting tags are available for this bundle.',
+    noSearchResults: 'No tags match this search.',
+    searchTooLong: 'Search is limited to 200 characters.',
+    invalidAutoCount: 'Enter a whole number greater than zero.',
+    autoCountTooLarge:
+      'Automatic selection cannot exceed the current result count: {count}.',
+    validationRequired:
+      'At least one tag must be selected for Smart Targeting.',
+    fetchError: 'Failed to load Smart Targeting tags. Please try again.',
+    autoSelectError:
+      'Failed to automatically select Smart Targeting tags. Please try again.',
+    unavailable: '—',
+    pagination: {
+      showing: 'Showing {from} to {to} of {total} tags',
+      rowsPerPage: 'Rows per page',
+      previous: 'Previous',
+      next: 'Next',
+    },
+  },
 
   // Bundle info
   bundleInfoTitle: 'Bundle Information',
@@ -267,6 +323,7 @@ const campaignLevelFa = {
   // Segmentation mode
   segmentationMode: 'نوع هدف‌گیری',
   segmentationByLevels: 'دسته‌بندی عادی',
+  segmentationBySmartTargeting: 'هدف‌گیری هوشمند',
   segmentationByTargetAudienceExcelFile: 'مخاطبان مشخص',
   segmentationByTargetAudienceExcelFileTitle: 'فایل اکسل مخاطبان',
   segmentationByTargetAudienceExcelFileHelp:
@@ -280,6 +337,62 @@ const campaignLevelFa = {
     'لطفاً یک فایل اکسل معتبر با فرمت xls. یا xlsx. بارگذاری کنید',
   segmentationByTargetAudienceExcelFileRequired:
     'لطفاً فایل اکسل را بارگذاری کنید',
+  smartTargeting: {
+    title: 'برچسب‌های هدف‌گیری هوشمند',
+    description:
+      'برچسب‌های این ارسال را انتخاب کنید. انتخاب‌ها با جستجو، مرتب‌سازی و صفحه‌بندی حفظ می‌شوند.',
+    searchLabel: 'جستجوی عنوان نمایشی برچسب',
+    searchPlaceholder: 'جستجوی برچسب‌ها',
+    sortByLabel: 'مرتب‌سازی بر اساس',
+    sortDirectionLabel: 'جهت',
+    defaultOrder: 'ترتیب پیش‌فرض',
+    ascending: 'صعودی',
+    descending: 'نزولی',
+    columns: {
+      selection: 'انتخاب',
+      tagDisplayTitle: 'عنوان نمایشی برچسب',
+      tagCapacity: 'ظرفیت برچسب',
+      bundlePersonaFitScore: 'امتیاز تناسب پرسونای کمپین',
+      testPhaseAvgCtr: 'میانگین CTR فاز تست',
+      overallAvgCtr: 'میانگین CTR کلی',
+    },
+    sortOptions: {
+      tagCapacity: 'ظرفیت برچسب',
+      bundlePersonaFitScore: 'امتیاز تناسب پرسونای کمپین',
+      testPhaseAvgCtr: 'میانگین CTR فاز تست',
+      overallAvgCtr: 'میانگین CTR کلی',
+    },
+    autoSelectLabel: 'تعداد برچسب برای انتخاب خودکار',
+    autoSelectPlaceholder: 'مثلاً: ۲۰',
+    autoSelectButton: 'انتخاب خودکار برچسب‌ها',
+    autoSelecting: 'در حال انتخاب...',
+    selectedTags: 'برچسب‌های انتخاب‌شده',
+    selectedRawCapacity: 'ظرفیت خام انتخاب‌شده',
+    audiences: 'مخاطب',
+    loading: 'در حال بارگذاری برچسب‌های هدف‌گیری هوشمند...',
+    refreshing: 'در حال به‌روزرسانی...',
+    retry: 'تلاش دوباره',
+    noBundle:
+      'برای انتخاب برچسب‌های هدف‌گیری هوشمند ابتدا یک کمپین انتخاب کنید.',
+    noTags: 'برای این کمپین برچسب هدف‌گیری هوشمند موجود نیست.',
+    noSearchResults: 'هیچ برچسبی با این جستجو پیدا نشد.',
+    searchTooLong: 'جستجو حداکثر ۲۰۰ کاراکتر است.',
+    invalidAutoCount: 'یک عدد صحیح بزرگ‌تر از صفر وارد کنید.',
+    autoCountTooLarge:
+      'انتخاب خودکار نمی‌تواند بیشتر از تعداد نتایج فعلی باشد: {count}.',
+    validationRequired: 'برای هدف‌گیری هوشمند حداقل یک برچسب باید انتخاب شود.',
+    fetchError:
+      'بارگذاری برچسب‌های هدف‌گیری هوشمند ناموفق بود. لطفاً دوباره تلاش کنید.',
+    autoSelectError:
+      'انتخاب خودکار برچسب‌های هدف‌گیری هوشمند ناموفق بود. لطفاً دوباره تلاش کنید.',
+    unavailable: '—',
+    pagination: {
+      showing: 'نمایش {from} تا {to} از {total} برچسب',
+      rowsPerPage: 'ردیف در صفحه',
+      previous: 'قبلی',
+      next: 'بعدی',
+    },
+  },
 
   // Bundle info
   bundleInfoTitle: 'اطلاعات کمپین',

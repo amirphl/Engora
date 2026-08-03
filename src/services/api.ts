@@ -1,6 +1,7 @@
 import {
   CreateCampaignPayload,
   CreateSMSCampaignResponse,
+  CloneCampaignResponse,
   CalculateCampaignCapacityRequest,
   CalculateCampaignCapacityResponse,
   CalculateCampaignCostRequest,
@@ -15,8 +16,13 @@ import {
   UpdateSMSCampaignResponse,
   SendCampaignTestMessageRequest,
   SendCampaignTestMessageResponse,
+  AutoSelectSmartTargetingTagsRequest,
+  ListSmartTargetingTagsParams,
+  ListSmartTargetingTagsResponse,
   ListSMSCampaignsParams,
   ListSMSCampaignsResponse,
+  ReplaceSmartTargetingSelectionRequest,
+  SmartTargetingSelectionResponse,
   UploadMultimediaResponse,
 } from '../types/campaign';
 import {
@@ -165,6 +171,9 @@ class ApiService {
 
   // Method to set access token for authenticated requests
   setAccessToken(token: string | null) {
+    if (this.accessToken !== token) {
+      this.inFlightRequests.clear();
+    }
     this.accessToken = token;
   }
 
@@ -431,13 +440,22 @@ class ApiService {
     endpoint: string,
     options: ApiRequestOptions = {}
   ): Promise<ApiResponse<T>> {
+    // Abort signals are caller-owned. Sharing those requests would let one
+    // unmounted consumer cancel every consumer waiting on the same endpoint.
+    if (options.signal) {
+      return this.request<T>(endpoint, options);
+    }
+
     const existing = this.inFlightRequests.get(cacheKey);
     if (existing) {
       return existing as Promise<ApiResponse<T>>;
     }
 
-    const requestPromise = this.request<T>(endpoint, options).finally(() => {
-      this.inFlightRequests.delete(cacheKey);
+    let requestPromise: Promise<ApiResponse<T>>;
+    requestPromise = this.request<T>(endpoint, options).finally(() => {
+      if (this.inFlightRequests.get(cacheKey) === requestPromise) {
+        this.inFlightRequests.delete(cacheKey);
+      }
     });
 
     this.inFlightRequests.set(cacheKey, requestPromise);
@@ -1006,13 +1024,195 @@ class ApiService {
 
   async cloneCampaign(
     uuid: string
-  ): Promise<ApiResponse<{ uuid: string; id?: number }>> {
+  ): Promise<ApiResponse<CloneCampaignResponse>> {
+    if (typeof uuid !== 'string' || !uuid.trim()) {
+      return this.createErrorResponse('INVALID_CAMPAIGN_UUID');
+    }
+
     const endpoint = config.endpoints.campaigns.clone.replace(
       ':uuid',
-      encodeURIComponent(uuid)
+      encodeURIComponent(uuid.trim())
     );
-    return this.request<{ uuid: string; id?: number }>(endpoint, {
+    return this.request<CloneCampaignResponse>(endpoint, {
       method: 'POST',
+    });
+  }
+
+  async listCampaignSmartTargetingTags(
+    uuid: string,
+    params: ListSmartTargetingTagsParams,
+    signal?: AbortSignal
+  ): Promise<ApiResponse<ListSmartTargetingTagsResponse>> {
+    if (!uuid || typeof uuid !== 'string' || !uuid.trim()) {
+      return this.createErrorResponse('INVALID_CAMPAIGN_UUID');
+    }
+    if (!Number.isInteger(params.page) || params.page < 1) {
+      return this.createErrorResponse('INVALID_PAGE');
+    }
+    if (
+      !Number.isInteger(params.page_size) ||
+      params.page_size < 1 ||
+      params.page_size > 100
+    ) {
+      return this.createErrorResponse('INVALID_PAGE_SIZE');
+    }
+    if (params.search && params.search.trim().length > 200) {
+      return this.createErrorResponse('SMART_TARGETING_SEARCH_TOO_LONG');
+    }
+
+    const query = new URLSearchParams();
+    query.set('page', String(params.page));
+    query.set('page_size', String(params.page_size));
+    if (params.search?.trim()) query.set('search', params.search.trim());
+    if (params.sort_by) query.set('sort_by', params.sort_by);
+    if (params.sort_direction) {
+      query.set('sort_direction', params.sort_direction);
+    }
+
+    const path = config.endpoints.campaigns.smartTargetingTags.replace(
+      ':uuid',
+      encodeURIComponent(uuid.trim())
+    );
+
+    return this.request<ListSmartTargetingTagsResponse>(
+      `${path}?${query.toString()}`,
+      { method: 'GET', signal }
+    );
+  }
+
+  async listBundleSmartTargetingTags(
+    bundleId: number,
+    params: ListSmartTargetingTagsParams,
+    signal?: AbortSignal
+  ): Promise<ApiResponse<ListSmartTargetingTagsResponse>> {
+    if (!Number.isInteger(bundleId) || bundleId <= 0) {
+      return this.createErrorResponse('INVALID_BUNDLE_ID');
+    }
+    if (!Number.isInteger(params.page) || params.page < 1) {
+      return this.createErrorResponse('INVALID_PAGE');
+    }
+    if (
+      !Number.isInteger(params.page_size) ||
+      params.page_size < 1 ||
+      params.page_size > 100
+    ) {
+      return this.createErrorResponse('INVALID_PAGE_SIZE');
+    }
+    if (params.search && params.search.trim().length > 200) {
+      return this.createErrorResponse('SMART_TARGETING_SEARCH_TOO_LONG');
+    }
+
+    const query = new URLSearchParams();
+    query.set('page', String(params.page));
+    query.set('page_size', String(params.page_size));
+    if (params.search?.trim()) query.set('search', params.search.trim());
+    if (params.sort_by) query.set('sort_by', params.sort_by);
+    if (params.sort_direction) {
+      query.set('sort_direction', params.sort_direction);
+    }
+
+    const path = config.endpoints.bundles.smartTargetingTags.replace(
+      ':id',
+      encodeURIComponent(String(bundleId))
+    );
+
+    return this.request<ListSmartTargetingTagsResponse>(
+      `${path}?${query.toString()}`,
+      { method: 'GET', signal }
+    );
+  }
+
+  async getCampaignSmartTargetingSelection(
+    uuid: string,
+    signal?: AbortSignal
+  ): Promise<ApiResponse<SmartTargetingSelectionResponse>> {
+    if (!uuid || typeof uuid !== 'string' || !uuid.trim()) {
+      return this.createErrorResponse('INVALID_CAMPAIGN_UUID');
+    }
+
+    const endpoint = config.endpoints.campaigns.smartTargetingSelection.replace(
+      ':uuid',
+      encodeURIComponent(uuid.trim())
+    );
+
+    return this.request<SmartTargetingSelectionResponse>(endpoint, {
+      method: 'GET',
+      signal,
+    });
+  }
+
+  async replaceCampaignSmartTargetingSelection(
+    uuid: string,
+    payload: ReplaceSmartTargetingSelectionRequest,
+    signal?: AbortSignal
+  ): Promise<ApiResponse<SmartTargetingSelectionResponse>> {
+    if (!uuid || typeof uuid !== 'string' || !uuid.trim()) {
+      return this.createErrorResponse('INVALID_CAMPAIGN_UUID');
+    }
+    const tagIds = Array.isArray(payload?.tag_ids)
+      ? payload.tag_ids.filter(id => Number.isInteger(id) && id > 0)
+      : [];
+    if (
+      tagIds.length === 0 ||
+      tagIds.length > 10000 ||
+      tagIds.length !== payload.tag_ids.length ||
+      new Set(tagIds).size !== tagIds.length
+    ) {
+      return this.createErrorResponse(
+        'SMART_TARGETING_SELECTION_INVALID',
+        'SMART_TARGETING_SELECTION_INVALID'
+      );
+    }
+
+    const endpoint = config.endpoints.campaigns.smartTargetingSelection.replace(
+      ':uuid',
+      encodeURIComponent(uuid.trim())
+    );
+
+    return this.request<SmartTargetingSelectionResponse>(endpoint, {
+      method: 'PUT',
+      body: JSON.stringify({ tag_ids: tagIds }),
+      signal,
+    });
+  }
+
+  async autoSelectCampaignSmartTargetingTags(
+    uuid: string,
+    payload: AutoSelectSmartTargetingTagsRequest,
+    signal?: AbortSignal
+  ): Promise<ApiResponse<SmartTargetingSelectionResponse>> {
+    if (!uuid || typeof uuid !== 'string' || !uuid.trim()) {
+      return this.createErrorResponse('INVALID_CAMPAIGN_UUID');
+    }
+    if (
+      !Number.isInteger(payload.count) ||
+      payload.count < 1 ||
+      payload.count > 10000 ||
+      (payload.search?.trim().length ?? 0) > 200
+    ) {
+      return this.createErrorResponse(
+        'SMART_TARGETING_AUTO_SELECT_INVALID',
+        'SMART_TARGETING_AUTO_SELECT_INVALID'
+      );
+    }
+
+    const endpoint =
+      config.endpoints.campaigns.smartTargetingAutoSelect.replace(
+        ':uuid',
+        encodeURIComponent(uuid.trim())
+      );
+
+    return this.request<SmartTargetingSelectionResponse>(endpoint, {
+      method: 'POST',
+      body: JSON.stringify({
+        count: payload.count,
+        ...(payload.search?.trim() ? { search: payload.search.trim() } : {}),
+        ...(payload.sort_by ? { sort_by: payload.sort_by } : {}),
+        ...(payload.sort_direction
+          ? { sort_direction: payload.sort_direction }
+          : {}),
+      }),
+      signal,
     });
   }
 
@@ -1020,8 +1220,12 @@ class ApiService {
     payload: HideCampaignsRequest
   ): Promise<ApiResponse<HideCampaignsResponse>> {
     const campaignIds = Array.isArray(payload.campaign_ids)
-      ? payload.campaign_ids.filter(
-          id => Number.isInteger(id) && Number.isFinite(id) && id > 0
+      ? Array.from(
+          new Set(
+            payload.campaign_ids.filter(
+              id => Number.isInteger(id) && Number.isFinite(id) && id > 0
+            )
+          )
         )
       : [];
 
@@ -1045,8 +1249,12 @@ class ApiService {
     payload: UnhideCampaignsRequest
   ): Promise<ApiResponse<UnhideCampaignsResponse>> {
     const campaignIds = Array.isArray(payload.campaign_ids)
-      ? payload.campaign_ids.filter(
-          id => Number.isInteger(id) && Number.isFinite(id) && id > 0
+      ? Array.from(
+          new Set(
+            payload.campaign_ids.filter(
+              id => Number.isInteger(id) && Number.isFinite(id) && id > 0
+            )
+          )
         )
       : [];
 
@@ -1620,7 +1828,14 @@ class ApiService {
     uuid: string,
     campaignData: UpdateSMSCampaignRequest
   ): Promise<ApiResponse<UpdateSMSCampaignResponse>> {
-    const url = config.endpoints.campaigns.update.replace(':uuid', uuid);
+    if (typeof uuid !== 'string' || !uuid.trim()) {
+      return this.createErrorResponse('INVALID_CAMPAIGN_UUID');
+    }
+
+    const url = config.endpoints.campaigns.update.replace(
+      ':uuid',
+      encodeURIComponent(uuid.trim())
+    );
     return this.request<UpdateSMSCampaignResponse>(url, {
       method: 'PUT',
       body: JSON.stringify(campaignData),
@@ -1632,9 +1847,13 @@ class ApiService {
     uuid: string,
     payload: SendCampaignTestMessageRequest
   ): Promise<ApiResponse<SendCampaignTestMessageResponse>> {
+    if (typeof uuid !== 'string' || !uuid.trim()) {
+      return this.createErrorResponse('INVALID_CAMPAIGN_UUID');
+    }
+
     const endpoint = config.endpoints.campaigns.testSend.replace(
       ':uuid',
-      encodeURIComponent(uuid)
+      encodeURIComponent(uuid.trim())
     );
     return this.request<SendCampaignTestMessageResponse>(endpoint, {
       method: 'POST',

@@ -3,7 +3,6 @@ import { BundleListItem } from '../../../../types/bundle';
 import { ReportsCopy } from '../../translations';
 
 export const FALLBACK_VALUE = '-';
-export const NOT_AVAILABLE_NOW = 'N/A';
 
 export const toNumericValue = (value: unknown): number | null => {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
@@ -55,9 +54,12 @@ export const getSegmentationMethod = (
   campaign: GetCampaignResponse,
   copy: ReportsCopy
 ): string =>
-  campaign.target_audience_excel_file_uuid
-    ? copy.modal.segmentationMethodExcelFile
-    : copy.modal.segmentationMethodLevels;
+  campaign.audience_targeting_method === 'smart_targeting'
+    ? copy.modal.segmentationMethodSmartTargeting
+    : campaign.target_audience_excel_file_uuid ||
+        campaign.audience_targeting_method === 'excel'
+      ? copy.modal.segmentationMethodExcelFile
+      : copy.modal.segmentationMethodLevels;
 
 export const getPhaseLabel = (
   phase: GetCampaignResponse['phase'],
@@ -92,7 +94,7 @@ export const getPlatformChannelLabel = (
     priceValue:
       platform === 'sms'
         ? formatNumberValue(campaign.line_price_factor)
-        : NOT_AVAILABLE_NOW,
+        : formatNumberValue(campaign.platform_base_price),
   };
 };
 

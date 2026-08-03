@@ -29,7 +29,10 @@ import { usePlatformSettingsList } from '../../../hooks/usePlatformSettingsList'
 import { useNavigation } from '../../../contexts/NavigationContext';
 import { config } from '../../../config/environment';
 import { storeSettingsPlatformIntent } from '../../../utils/platformSettingsNavigation';
-import { normalizeLinkPlaceholder } from '../../../utils/campaignUtils';
+import {
+  LINK_PLACEHOLDER,
+  normalizeLinkPlaceholder,
+} from '../../../utils/campaignUtils';
 
 const ContentStep: React.FC = () => {
   const { campaignData, updateContent } = useCampaign();
@@ -40,6 +43,7 @@ const ContentStep: React.FC = () => {
   const { accessToken } = useAuth();
   const { showError } = useToast();
   const showErrorRef = useRef(showError);
+  const mediaUploadSequenceRef = useRef(0);
   const { uploadMedia, isUploading } = useMediaUpload(accessToken);
   const { navigate } = useNavigation();
   const platform = campaignData.segment.platform || 'sms';
@@ -48,11 +52,14 @@ const ContentStep: React.FC = () => {
   const [previewType, setPreviewType] = useState<CampaignMediaType | null>(
     null
   );
-  const { options: platformOptions, error: platformOptionsError } =
-    usePlatformSettingsList(
-      accessToken,
-      platform === 'sms' ? 'bale' : platform
-    );
+  const {
+    options: platformOptions,
+    isLoading: isLoadingPlatformOptions,
+    error: platformOptionsError,
+  } = usePlatformSettingsList(
+    accessToken,
+    platform === 'sms' ? 'bale' : platform
+  );
 
   useEffect(() => {
     showErrorRef.current = showError;
@@ -75,9 +82,16 @@ const ContentStep: React.FC = () => {
   // Event handlers
   const handleInsertLinkChange = (value: boolean) => {
     const newInsertLink = value;
+    const normalizedText = normalizeLinkPlaceholder(campaignData.content.text);
     updateContent({
       insertLink: newInsertLink,
       link: newInsertLink ? campaignData.content.link : '',
+      shortLinkDomain: newInsertLink
+        ? campaignData.content.shortLinkDomain
+        : null,
+      text: newInsertLink
+        ? normalizedText
+        : normalizedText.split(LINK_PLACEHOLDER).join('').trimEnd(),
     });
     clearError();
     if (!newInsertLink) {
@@ -130,11 +144,14 @@ const ContentStep: React.FC = () => {
     name: string;
     type: CampaignMediaType;
   }) => {
+    const uploadSequence = mediaUploadSequenceRef.current + 1;
+    mediaUploadSequenceRef.current = uploadSequence;
     setPreviewUrl(payload.previewUrl);
     setPreviewName(payload.name);
     setPreviewType(payload.type);
     updateContent({ mediaUuid: null });
     const uuid = await uploadMedia(payload.file);
+    if (mediaUploadSequenceRef.current !== uploadSequence) return;
     if (!uuid) {
       setPreviewUrl(null);
       setPreviewName(null);
@@ -146,6 +163,7 @@ const ContentStep: React.FC = () => {
   };
 
   const handleMediaClear = useCallback(() => {
+    mediaUploadSequenceRef.current += 1;
     setPreviewUrl(null);
     setPreviewName(null);
     setPreviewType(null);
@@ -191,7 +209,7 @@ const ContentStep: React.FC = () => {
         }
         const url = URL.createObjectURL(res.blob);
         setPreviewUrl(url);
-        setPreviewType('image');
+        setPreviewType(res.blob.type.startsWith('video/') ? 'video' : 'image');
         setPreviewName(res.filename || 'media');
       })
       .catch(() => {
@@ -215,6 +233,57 @@ const ContentStep: React.FC = () => {
     isLoading: isLoadingLineNumbers,
     error: lineNumbersError,
   } = useLineNumbers(accessToken);
+
+  useEffect(() => {
+    const selectedLineNumber = campaignData.content.lineNumber;
+    if (
+      platform !== 'sms' ||
+      !accessToken ||
+      isLoadingLineNumbers ||
+      lineNumbersError ||
+      !selectedLineNumber
+    ) {
+      return;
+    }
+    if (
+      !lineNumberOptions.some(option => option.value === selectedLineNumber)
+    ) {
+      updateContent({ lineNumber: '' });
+    }
+  }, [
+    campaignData.content.lineNumber,
+    accessToken,
+    isLoadingLineNumbers,
+    lineNumberOptions,
+    lineNumbersError,
+    platform,
+    updateContent,
+  ]);
+
+  useEffect(() => {
+    const selectedId = campaignData.content.platformSettingsId;
+    if (
+      platform === 'sms' ||
+      !accessToken ||
+      isLoadingPlatformOptions ||
+      platformOptionsError ||
+      !selectedId
+    ) {
+      return;
+    }
+    if (!platformOptions.some(option => Number(option.value) === selectedId)) {
+      updateContent({ platformSettingsId: null });
+    }
+  }, [
+    campaignData.content.platformSettingsId,
+    accessToken,
+    isLoadingPlatformOptions,
+    platform,
+    platformOptions,
+    platformOptionsError,
+    updateContent,
+  ]);
+
   useEffect(() => {
     if (platform === 'sms') {
       if (
@@ -240,6 +309,7 @@ const ContentStep: React.FC = () => {
   const handleReset = () => {
     clearError();
     resetLinkCharacter();
+    handleMediaClear();
     setDateTimePicker(false, scheduleAt => updateContent({ scheduleAt }));
     updateContent({
       insertLink: false,
@@ -353,6 +423,7 @@ const ContentStep: React.FC = () => {
             immediateLabel={t.campaignImmediate}
             dateTimeLabel={t.scheduleDateTime}
             tooSoonError={t.scheduleTooSoon}
+            outsideWindowError={t.scheduleOutsideWindow}
           />
         </div>
 

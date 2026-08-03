@@ -43,7 +43,7 @@ const PaymentStep: React.FC = () => {
     hasEnoughBalance,
     balanceChecked,
     getWalletBalance,
-  } = useWalletBalance(campaignData.budget.totalBudget, total, updatePayment);
+  } = useWalletBalance(accessToken, total, updatePayment);
   const { lineNumberOptions } = useLineNumbers(accessToken);
 
   // Trigger cost calculation
@@ -72,14 +72,6 @@ const PaymentStep: React.FC = () => {
     window.location.href = '/dashboard/wallet';
   };
 
-  const hasRequiredData = !!(
-    campaignData.segment.level1 &&
-    campaignData.content.text &&
-    campaignData.budget.totalBudget &&
-    (platform === 'sms'
-      ? campaignData.content.lineNumber
-      : campaignData.content.platformSettingsId)
-  );
   const costPerMessage =
     total !== undefined && messageCount && messageCount > 0
       ? total / messageCount
@@ -90,6 +82,34 @@ const PaymentStep: React.FC = () => {
           opt => opt.value === campaignData.content.lineNumber
         )?.priceFactor
       : undefined;
+  const audienceTargetingMethod =
+    campaignData.segment.audienceTargetingMethod ??
+    (campaignData.segment.targetAudienceExcelFileUuid != null
+      ? 'excel'
+      : 'standard');
+  const hasAudienceSelection =
+    audienceTargetingMethod === 'smart_targeting'
+      ? (campaignData.segment.selectedTagIds?.length ?? 0) > 0 &&
+        campaignData.segment.selectedTagIds?.every(
+          tagId => Number.isInteger(tagId) && tagId > 0
+        )
+      : audienceTargetingMethod === 'excel'
+        ? typeof campaignData.segment.targetAudienceExcelFileUuid ===
+            'string' &&
+          campaignData.segment.targetAudienceExcelFileUuid.trim().length > 0
+        : !!campaignData.segment.level1?.trim() &&
+          (campaignData.segment.level2s?.length ?? 0) > 0 &&
+          (campaignData.segment.level3s?.length ?? 0) > 0 &&
+          (campaignData.segment.tags?.length ?? 0) > 0 &&
+          (campaignData.segment.audienceGrades?.length ?? 0) > 0;
+  const hasRequiredData = !!(
+    hasAudienceSelection &&
+    campaignData.content.text.trim() &&
+    campaignData.budget.totalBudget &&
+    (platform === 'sms'
+      ? campaignData.content.lineNumber
+      : campaignData.content.platformSettingsId)
+  );
 
   return (
     <div className='space-y-8'>

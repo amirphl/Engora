@@ -2,7 +2,6 @@ import React from 'react';
 import ModalShell from './ModalShell';
 import { AdminCustomerManagementCopy } from '../translations';
 import { AdminGetCampaignResponse } from '../../../types/admin';
-import { getShortLinkDomainOrDefault } from '../../../utils/campaignUtils';
 import {
   CampaignSpecInfoGrid,
   CampaignSpecInfoItem,
@@ -171,8 +170,8 @@ const CampaignDetailsModal: React.FC<CampaignDetailsModalProps> = ({
                 <CampaignSpecInfoItem
                   label={fields.shortLinkDomain}
                   value={
-                    hasAdlink
-                      ? getShortLinkDomainOrDefault(campaign.short_link_domain)
+                    hasAdlink && campaign.short_link_domain?.trim()
+                      ? campaign.short_link_domain.trim()
                       : '-'
                   }
                 />

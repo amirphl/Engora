@@ -16,8 +16,12 @@ import TestMessageSection from './TestMessageSection';
 const BudgetStep: React.FC = () => {
   const { campaignData, updateBudget } = useCampaign();
   const platform = campaignData.segment.platform || 'sms';
-  const isTargetAudienceExcelFileMode =
-    campaignData.segment.targetAudienceExcelFileUuid !== null;
+  const audienceTargetingMethod =
+    campaignData.segment.audienceTargetingMethod ??
+    (campaignData.segment.targetAudienceExcelFileUuid != null
+      ? 'excel'
+      : 'standard');
+  const hideCapacityCount = audienceTargetingMethod !== 'standard';
   const { language } = useLanguage();
   const t = budgetI18n[language as keyof typeof budgetI18n] || budgetI18n.en;
   const { accessToken } = useAuth();
@@ -51,7 +55,7 @@ const BudgetStep: React.FC = () => {
 
   const handleTotalBudgetChange = (value: number) => {
     const numeric = Number.isFinite(value) ? value : 0;
-    const normalized = Math.max(0, numeric);
+    const normalized = Math.max(0, Math.floor(numeric));
     updateBudget({ totalBudget: normalized });
     if (
       normalized >= MIN_TEXT_BUDGET &&
@@ -60,6 +64,8 @@ const BudgetStep: React.FC = () => {
         (platform !== 'sms' && campaignData.content.platformSettingsId))
     ) {
       calculateDebounced(campaignData.content.lineNumber, normalized);
+    } else {
+      resetMessageCount();
     }
     if (budgetDebounceRef.current) {
       clearTimeout(budgetDebounceRef.current);
@@ -68,7 +74,11 @@ const BudgetStep: React.FC = () => {
 
   const handlePercentBudgetChange = useCallback(
     (percent: number, amount: number) => {
-      if (percent <= 0) return;
+      if (percent <= 0) {
+        resetMessageCount();
+        updateBudget({ totalBudget: 0, estimatedMessages: undefined });
+        return;
+      }
       const rounded = Math.max(0, Math.floor(amount / 1000) * 1000);
       updateBudget({ totalBudget: rounded });
       if (
@@ -78,6 +88,8 @@ const BudgetStep: React.FC = () => {
           (platform !== 'sms' && campaignData.content.platformSettingsId))
       ) {
         calculateDebounced(campaignData.content.lineNumber, rounded);
+      } else {
+        resetMessageCount();
       }
     },
     [
@@ -86,6 +98,7 @@ const BudgetStep: React.FC = () => {
       campaignData.content.platformSettingsId,
       calculateDebounced,
       platform,
+      resetMessageCount,
       updateBudget,
     ]
   );
@@ -149,7 +162,7 @@ const BudgetStep: React.FC = () => {
             enterBudgetText={t.enterBudgetToSee}
             sentLabel={t.sentCountLabel}
             capacityLabel={t.capacityCountLabel}
-            showCapacity={!isTargetAudienceExcelFileMode}
+            showCapacity={!hideCapacityCount}
             idleText={
               hasCalculationInputs ? t.calculateMessageCount : undefined
             }

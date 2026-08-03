@@ -93,17 +93,11 @@ const FiltersBar: React.FC<FiltersBarProps> = ({
       normalizedValue.convert(gregorian, gregorian_en);
     }
 
-    return new Date(
-      Date.UTC(
-        normalizedValue.year,
-        normalizedValue.month.number - 1,
-        normalizedValue.day,
-        normalizedValue.hour,
-        normalizedValue.minute,
-        normalizedValue.second,
-        normalizedValue.millisecond
-      )
-    ).toISOString();
+    const localDate = normalizedValue.toDate();
+    if (Number.isNaN(localDate.getTime())) {
+      throw new Error('Invalid report date filter');
+    }
+    return localDate.toISOString();
   };
 
   const handleDateChange =
