@@ -12,6 +12,7 @@ import { useLanguage } from '../../../hooks/useLanguage';
 import { getApiErrorMessage } from '../../../utils/errorHandler';
 import {
   ListSmartTargetingTagsResponse,
+  ListSmartTargetingTagsParams,
   PaginationInfo,
   SmartTargetingSortBy,
   SmartTargetingSortDirection,
@@ -84,6 +85,14 @@ interface SmartTargetingTagsTableProps {
   selectedTagIds: number[];
   selectedRawCapacity: number;
   selectionIsDirty: boolean;
+  preserveSelectionOrder?: boolean;
+  initialSortBy?: SmartTargetingSortBy | '';
+  initialSortDirection?: SmartTargetingSortDirection;
+  onSortChange?: (
+    sortBy: SmartTargetingSortBy | '',
+    sortDirection: SmartTargetingSortDirection
+  ) => void;
+  onSelectionOrderSyncChange?: (pending: boolean) => void;
   onSelectionChange: (
     tagIds: number[],
     selectedRawCapacity: number,
@@ -216,6 +225,11 @@ const SmartTargetingTagsTable: React.FC<SmartTargetingTagsTableProps> = ({
   selectedTagIds,
   selectedRawCapacity,
   selectionIsDirty,
+  preserveSelectionOrder = false,
+  initialSortBy = '',
+  initialSortDirection = 'desc',
+  onSortChange,
+  onSelectionOrderSyncChange,
   onSelectionChange,
   copy,
 }) => {
@@ -229,9 +243,11 @@ const SmartTargetingTagsTable: React.FC<SmartTargetingTagsTableProps> = ({
   const [pageSize, setPageSize] = useState(20);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [sortBy, setSortBy] = useState<SmartTargetingSortBy | ''>('');
+  const [sortBy, setSortBy] = useState<SmartTargetingSortBy | ''>(
+    initialSortBy
+  );
   const [sortDirection, setSortDirection] =
-    useState<SmartTargetingSortDirection>('desc');
+    useState<SmartTargetingSortDirection>(initialSortDirection);
   const [effectiveSortBy, setEffectiveSortBy] = useState<
     SmartTargetingSortBy | ''
   >('');
@@ -256,6 +272,8 @@ const SmartTargetingTagsTable: React.FC<SmartTargetingTagsTableProps> = ({
   const autoAbortRef = useRef<AbortController | null>(null);
   const autoInFlightRef = useRef(false);
   const pageRequestInFlightRef = useRef(false);
+  const orderSequenceRef = useRef(0);
+  const orderAbortRef = useRef<AbortController | null>(null);
   const tableContextKey = `${campaignUuid || 'new'}:${bundleId || 'none'}:${
     useCampaignEndpoints ? 'campaign' : 'bundle'
   }`;
@@ -293,21 +311,23 @@ const SmartTargetingTagsTable: React.FC<SmartTargetingTagsTableProps> = ({
     setPage(1);
     setSearch('');
     setDebouncedSearch('');
-    setSortBy('');
-    setSortDirection('desc');
+    setSortBy(initialSortBy);
+    setSortDirection(initialSortDirection);
     setEffectiveSortBy('');
     setEffectiveSortDirection('');
     setEvaluationAvailable(false);
     setError(null);
     setAutoError(null);
     setIsAutoSelecting(false);
-  }, [tableContextKey]);
+  }, [initialSortBy, initialSortDirection, tableContextKey]);
 
   useEffect(
     () => () => {
       requestSeqRef.current += 1;
       autoSeqRef.current += 1;
       autoAbortRef.current?.abort();
+      orderSequenceRef.current += 1;
+      orderAbortRef.current?.abort();
     },
     []
   );
@@ -323,6 +343,10 @@ const SmartTargetingTagsTable: React.FC<SmartTargetingTagsTableProps> = ({
   }, [search]);
 
   const selectedSet = useMemo(() => new Set(selectedTagIds), [selectedTagIds]);
+  const selectionMembershipKey = useMemo(
+    () => [...selectedSet].sort((left, right) => left - right).join(','),
+    [selectedSet]
+  );
 
   const sortOptions = useMemo(
     () =>
@@ -493,6 +517,175 @@ const SmartTargetingTagsTable: React.FC<SmartTargetingTagsTableProps> = ({
     return () => controller.abort();
   }, [fetchTags, refreshKey]);
 
+  useEffect(() => {
+    if (
+      !preserveSelectionOrder ||
+      !bundleId ||
+      bundleId <= 0 ||
+      selectedTagIdsRef.current.length < 2
+    ) {
+      onSelectionOrderSyncChange?.(false);
+      return;
+    }
+
+    onSelectionOrderSyncChange?.(true);
+    const timer = window.setTimeout(() => {
+      const requestedIds = [...selectedTagIdsRef.current];
+      const requestedSet = new Set(requestedIds);
+      const sequence = orderSequenceRef.current + 1;
+      orderSequenceRef.current = sequence;
+      const controller = new AbortController();
+      orderAbortRef.current?.abort();
+      orderAbortRef.current = controller;
+
+      const loadPage = async (nextPage: number) => {
+        const params: ListSmartTargetingTagsParams = {
+          page: nextPage,
+          page_size: 100,
+          sort_by: sortBy || undefined,
+          sort_direction: sortBy ? sortDirection : undefined,
+        };
+        return useCampaignEndpoints && campaignUuid
+          ? apiService.listCampaignSmartTargetingTags(
+              campaignUuid,
+              params,
+              controller.signal
+            )
+          : apiService.listBundleSmartTargetingTags(
+              bundleId,
+              params,
+              controller.signal
+            );
+      };
+
+      void (async () => {
+        const firstResponse = await loadPage(1);
+        if (
+          controller.signal.aborted ||
+          orderSequenceRef.current !== sequence ||
+          !firstResponse.success ||
+          !firstResponse.data
+        ) {
+          if (
+            !controller.signal.aborted &&
+            orderSequenceRef.current === sequence
+          ) {
+            setError(
+              getApiErrorMessage(firstResponse, language, copy.fetchError)
+            );
+          }
+          return;
+        }
+
+        const firstPagination = normalizePagination(
+          firstResponse.data.pagination,
+          100
+        );
+        const orderedIds = normalizeRows(firstResponse.data.items)
+          .map(row => row.tag_id)
+          .filter(tagId => requestedSet.has(tagId));
+        const found = new Set(orderedIds);
+
+        for (
+          let pageStart = 2;
+          pageStart <= firstPagination.total_pages &&
+          found.size < requestedSet.size;
+          pageStart += AUTO_SELECTION_PAGE_CONCURRENCY
+        ) {
+          const pageNumbers = Array.from(
+            {
+              length: Math.min(
+                AUTO_SELECTION_PAGE_CONCURRENCY,
+                firstPagination.total_pages - pageStart + 1
+              ),
+            },
+            (_, index) => pageStart + index
+          );
+          const pageResponses = await Promise.all(
+            pageNumbers.map(async pageNumber => ({
+              pageNumber,
+              response: await loadPage(pageNumber),
+            }))
+          );
+          if (
+            controller.signal.aborted ||
+            orderSequenceRef.current !== sequence
+          ) {
+            return;
+          }
+          pageResponses
+            .sort((left, right) => left.pageNumber - right.pageNumber)
+            .forEach(({ response }) => {
+              if (!response.success || !response.data) return;
+              normalizeRows(response.data.items).forEach(row => {
+                if (requestedSet.has(row.tag_id) && !found.has(row.tag_id)) {
+                  found.add(row.tag_id);
+                  orderedIds.push(row.tag_id);
+                }
+              });
+            });
+        }
+
+        if (
+          controller.signal.aborted ||
+          orderSequenceRef.current !== sequence
+        ) {
+          return;
+        }
+        if (
+          found.size !== requestedSet.size ||
+          !areSameIdSet(selectedTagIdsRef.current, orderedIds)
+        ) {
+          setError(copy.fetchError);
+          return;
+        }
+        if (
+          orderedIds.every(
+            (tagId, index) => selectedTagIdsRef.current[index] === tagId
+          )
+        ) {
+          onSelectionOrderSyncChange?.(false);
+          return;
+        }
+
+        hasUserEditedRef.current = true;
+        onSelectionChangeRef.current(
+          orderedIds,
+          selectedRawCapacityRef.current,
+          'local'
+        );
+        onSelectionOrderSyncChange?.(false);
+      })()
+        .catch(() => {
+          if (
+            !controller.signal.aborted &&
+            orderSequenceRef.current === sequence
+          ) {
+            setError(copy.fetchError);
+          }
+        })
+        .finally(() => {
+          if (orderAbortRef.current === controller) {
+            orderAbortRef.current = null;
+          }
+        });
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [
+    bundleId,
+    campaignUuid,
+    copy.fetchError,
+    language,
+    onSelectionOrderSyncChange,
+    preserveSelectionOrder,
+    refreshKey,
+    selectionMembershipKey,
+    sortBy,
+    sortDirection,
+    useCampaignEndpoints,
+  ]);
+
   const handleTableScroll = (event: React.UIEvent<HTMLDivElement>) => {
     if (isLoading || pageRequestInFlightRef.current || page >= totalPages) {
       return;
@@ -533,6 +726,15 @@ const SmartTargetingTagsTable: React.FC<SmartTargetingTagsTableProps> = ({
   const handleSortByChange = (nextSortBy: SmartTargetingSortBy | '') => {
     setSortBy(nextSortBy);
     setPage(1);
+    onSortChange?.(nextSortBy, sortDirection);
+  };
+
+  const handleSortDirectionChange = (
+    nextDirection: SmartTargetingSortDirection
+  ) => {
+    setSortDirection(nextDirection);
+    setPage(1);
+    onSortChange?.(sortBy, nextDirection);
   };
 
   const getAutoCountValidation = (
@@ -842,7 +1044,7 @@ const SmartTargetingTagsTable: React.FC<SmartTargetingTagsTableProps> = ({
             <select
               value={sortDirection}
               onChange={event =>
-                setSortDirection(
+                handleSortDirectionChange(
                   event.target.value as SmartTargetingSortDirection
                 )
               }
