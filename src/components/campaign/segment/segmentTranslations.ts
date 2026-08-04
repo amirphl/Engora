@@ -176,6 +176,116 @@ const campaignLevelEn = {
       previous: 'Previous',
       next: 'Next',
     },
+    exactCapacity: {
+      title: 'Exact Smart Targeting Capacity',
+      description:
+        'Calculate the deduplicated audience capacity for the current tags and score classes.',
+      scoreClassesLabel: 'Audience Score Classes',
+      classA: 'Class A',
+      classAMeaning: 'Scores above the 66th percentile',
+      classB: 'Class B',
+      classBMeaning: 'Scores between the 33rd and 66th percentiles',
+      classC: 'Class C',
+      classCMeaning: 'Scores up to the 33rd percentile',
+      allClasses: 'No restriction selected; all classes will be included.',
+      calculate: 'Calculate Exact Capacity',
+      starting: 'Requesting calculation...',
+      loadingCurrent: 'Loading the latest exact-capacity calculation...',
+      statusLabel: 'Status',
+      notCalculated: 'Not Calculated',
+      calculating: 'Calculating',
+      calculated: 'Calculated',
+      recalculationRequired: 'Recalculation Required',
+      failed: 'Calculation Failed',
+      selectedTags: 'Selected Tags',
+      selectedRawCapacity: 'Selected Raw Capacity',
+      eligibleBeforeDeduction:
+        'Eligible Unique Audience Before Approved Campaign Deduction',
+      approvedDeduction: 'Approved Campaign Audience Deduction',
+      exactUsableCapacity: 'Exact Usable Capacity',
+      audiences: 'audiences',
+      selectTags: 'Select at least one tag before calculating exact capacity.',
+      completeCampaignDataFirst:
+        'Complete the required Campaign data before calculating exact capacity.',
+      campaignWillBeCreated:
+        'This Campaign will be created before the exact-capacity calculation starts.',
+      campaignCreationFailed:
+        'The Campaign could not be created. No capacity calculation was started.',
+      serverRequiresCalculation:
+        'The Campaign could not proceed because its exact capacity is missing or stale. Calculate it before continuing.',
+      calculationInProgress: 'Exact-capacity calculation is in progress.',
+      recalculationMessage:
+        'The selected tags or audience score classes have changed. Recalculate the exact capacity to view the current exact usable capacity.',
+      calculationFailed: 'Exact-capacity calculation failed. Please try again.',
+      calculationUnavailable: 'The calculation result is unavailable.',
+      zeroCapacity: 'No usable audience capacity is currently available.',
+      fetchError:
+        'Failed to load the exact-capacity calculation. Please try again.',
+      startError:
+        'Failed to request the exact-capacity calculation. Please try again.',
+      invalidResponse: 'An invalid response was received from the server.',
+      pollingRetry:
+        'The latest status could not be loaded. Retrying automatically...',
+      pollingStopped:
+        'Status updates are delayed after repeated connection failures. Retrying automatically...',
+      selectionChangedDuringRequest:
+        'The tag or score-class selection changed during the request. Calculate again with the current selection.',
+      unknownStatus:
+        'The server returned an unsupported calculation status. Please try again.',
+    },
+    testPreview: {
+      title: 'Smart Targeting Test Sample',
+      description:
+        'Configure the all-or-nothing sample for each selected tag and check current availability.',
+      sampleSizeLabel: 'Sample Size per Tag',
+      sampleSizeHelp:
+        'Each tag must provide this full sample or it will be skipped. Changing this value does not run a preview.',
+      sampleSizeInvalid: 'Enter a positive whole number for each tag.',
+      scoreClassesLabel: 'Audience Score Classes',
+      classA: 'Class A',
+      classAMeaning: 'Scores above the 66th percentile',
+      classB: 'Class B',
+      classBMeaning: 'Scores between the 33rd and 66th percentiles',
+      classC: 'Class C',
+      classCMeaning: 'Scores up to the 33rd percentile',
+      allClasses: 'No restriction selected; all classes will be included.',
+      selectedTags: 'Selected Tags',
+      requestedAudience: 'Requested Test Audience',
+      satisfiedTags: 'Satisfied Tags',
+      unsatisfiedTags: 'Unsatisfied Tags',
+      effectiveAudience: 'Effective Test Audience',
+      campaignCost: 'Estimated Campaign Cost',
+      audiences: 'audiences',
+      currency: 'Toman',
+      checkAvailability: 'Check Test Sample Availability',
+      checkingAvailability: 'Checking availability...',
+      selectTags: 'Select at least one tag before checking availability.',
+      completeCampaignDataFirst:
+        'Complete the required Campaign data before checking availability.',
+      campaignWillBeCreated:
+        'This Campaign will be saved before availability is checked.',
+      campaignPreparationFailed:
+        'The Campaign configuration could not be saved.',
+      selectionSaveFailed:
+        'The ordered tag selection could not be saved. Please try again.',
+      previewFailed:
+        'Test sample availability could not be checked. Please try again.',
+      invalidResponse: 'An invalid preview response was received.',
+      inputsChangedDuringRequest:
+        'The Test sampling configuration changed during the request. Check availability again.',
+      selectionOrderPending:
+        'Wait for the selected tags to be synchronized with the current table order.',
+      stale:
+        'The previous preview is stale because the Test sampling inputs changed.',
+      previewRequired:
+        'Run the availability check to determine the effective Test audience and cost.',
+      unsatisfiedWarning:
+        'The following tags do not currently have enough eligible audiences to provide the requested sample and will be skipped.',
+      availabilityLabel: 'Available audiences',
+      tagLabel: 'Tag',
+      estimateLimitation:
+        'This preview reflects current audience availability. Final Test audience selection is performed at scheduler runtime and may differ if availability changes.',
+    },
   },
 
   // Bundle info
@@ -391,6 +501,113 @@ const campaignLevelFa = {
       rowsPerPage: 'ردیف در صفحه',
       previous: 'قبلی',
       next: 'بعدی',
+    },
+    exactCapacity: {
+      title: 'ظرفیت دقیق هدف‌گیری هوشمند',
+      description:
+        'ظرفیت یکتای مخاطبان را برای برچسب‌ها و کلاس‌های نمره فعلی محاسبه کنید.',
+      scoreClassesLabel: 'کلاس‌های نمره مخاطب',
+      classA: 'کلاس الف',
+      classAMeaning: 'نمره‌های بالاتر از صدک ۶۶',
+      classB: 'کلاس ب',
+      classBMeaning: 'نمره‌های بین صدک ۳۳ و ۶۶',
+      classC: 'کلاس ج',
+      classCMeaning: 'نمره‌ها تا صدک ۳۳',
+      allClasses: 'محدودیتی انتخاب نشده است؛ همه کلاس‌ها لحاظ می‌شوند.',
+      calculate: 'محاسبه ظرفیت دقیق',
+      starting: 'در حال ثبت درخواست محاسبه...',
+      loadingCurrent: 'در حال بارگذاری آخرین محاسبه ظرفیت دقیق...',
+      statusLabel: 'وضعیت',
+      notCalculated: 'محاسبه نشده',
+      calculating: 'در حال محاسبه',
+      calculated: 'محاسبه شده',
+      recalculationRequired: 'نیاز به محاسبه مجدد',
+      failed: 'خطا در محاسبه',
+      selectedTags: 'تعداد برچسب‌های انتخاب‌شده',
+      selectedRawCapacity: 'ظرفیت خام انتخاب‌شده',
+      eligibleBeforeDeduction:
+        'ظرفیت یکتای واجد شرایط پیش از کسر ارسال‌های تأییدشده',
+      approvedDeduction: 'کسر ظرفیت مخاطبان ارسال‌های تأییدشده',
+      exactUsableCapacity: 'ظرفیت دقیق قابل استفاده',
+      audiences: 'مخاطب',
+      selectTags: 'برای محاسبه ظرفیت دقیق، ابتدا حداقل یک برچسب انتخاب کنید.',
+      completeCampaignDataFirst:
+        'پیش از محاسبه ظرفیت دقیق، اطلاعات الزامی ارسال را تکمیل کنید.',
+      campaignWillBeCreated:
+        'پیش از شروع محاسبه ظرفیت دقیق، این ارسال ایجاد خواهد شد.',
+      campaignCreationFailed: 'ایجاد ارسال ناموفق بود و محاسبه ظرفیت آغاز نشد.',
+      serverRequiresCalculation:
+        'ادامه ارسال به‌دلیل نبودن یا قدیمی بودن ظرفیت دقیق ممکن نیست. پیش از ادامه، ظرفیت را محاسبه کنید.',
+      calculationInProgress: 'محاسبه ظرفیت دقیق در حال انجام است.',
+      recalculationMessage:
+        'انتخاب برچسب‌ها یا کلاس نمره مخاطب تغییر کرده است. برای مشاهده ظرفیت دقیق قابل استفاده، دوباره محاسبه را انجام دهید.',
+      calculationFailed:
+        'محاسبه ظرفیت دقیق با خطا مواجه شد. لطفاً دوباره تلاش کنید.',
+      calculationUnavailable: 'نتیجه محاسبه در دسترس نیست.',
+      zeroCapacity: 'در حال حاضر ظرفیت مخاطب قابل استفاده‌ای وجود ندارد.',
+      fetchError:
+        'بارگذاری محاسبه ظرفیت دقیق ناموفق بود. لطفاً دوباره تلاش کنید.',
+      startError:
+        'ثبت درخواست محاسبه ظرفیت دقیق ناموفق بود. لطفاً دوباره تلاش کنید.',
+      invalidResponse: 'پاسخ نامعتبری از سرور دریافت شد.',
+      pollingRetry:
+        'دریافت آخرین وضعیت ناموفق بود. تلاش مجدد به‌صورت خودکار انجام می‌شود...',
+      pollingStopped:
+        'پس از چند خطای ارتباطی، به‌روزرسانی وضعیت با تأخیر مواجه شده است و تلاش مجدد به‌صورت خودکار انجام می‌شود.',
+      selectionChangedDuringRequest:
+        'انتخاب برچسب یا کلاس نمره هنگام درخواست تغییر کرد. محاسبه را برای انتخاب فعلی دوباره انجام دهید.',
+      unknownStatus:
+        'سرور وضعیت محاسبه پشتیبانی‌نشده‌ای برگرداند. لطفاً دوباره تلاش کنید.',
+    },
+    testPreview: {
+      title: 'نمونه فاز تست هدف‌گیری هوشمند',
+      description:
+        'اندازه نمونه کامل هر برچسب را تنظیم کرده و موجودی فعلی را بررسی کنید.',
+      sampleSizeLabel: 'اندازه نمونه برای هر برچسب',
+      sampleSizeHelp:
+        'هر برچسب باید کل نمونه را تأمین کند؛ در غیر این صورت رد می‌شود. تغییر این مقدار پیش‌نمایش را اجرا نمی‌کند.',
+      sampleSizeInvalid: 'برای هر برچسب یک عدد صحیح مثبت وارد کنید.',
+      scoreClassesLabel: 'کلاس‌های نمره مخاطب',
+      classA: 'کلاس الف',
+      classAMeaning: 'نمره‌های بالاتر از صدک ۶۶',
+      classB: 'کلاس ب',
+      classBMeaning: 'نمره‌های بین صدک ۳۳ و ۶۶',
+      classC: 'کلاس ج',
+      classCMeaning: 'نمره‌ها تا صدک ۳۳',
+      allClasses: 'محدودیتی انتخاب نشده است؛ همه کلاس‌ها لحاظ می‌شوند.',
+      selectedTags: 'برچسب‌های انتخاب‌شده',
+      requestedAudience: 'مخاطبان درخواستی تست',
+      satisfiedTags: 'برچسب‌های تأمین‌شده',
+      unsatisfiedTags: 'برچسب‌های تأمین‌نشده',
+      effectiveAudience: 'مخاطبان مؤثر تست',
+      campaignCost: 'هزینه تخمینی ارسال',
+      audiences: 'مخاطب',
+      currency: 'تومان',
+      checkAvailability: 'بررسی موجودی نمونه تست',
+      checkingAvailability: 'در حال بررسی موجودی...',
+      selectTags: 'پیش از بررسی موجودی حداقل یک برچسب انتخاب کنید.',
+      completeCampaignDataFirst:
+        'پیش از بررسی موجودی، اطلاعات الزامی ارسال را تکمیل کنید.',
+      campaignWillBeCreated: 'پیش از بررسی موجودی، این ارسال ذخیره خواهد شد.',
+      campaignPreparationFailed: 'ذخیره پیکربندی ارسال ناموفق بود.',
+      selectionSaveFailed:
+        'ذخیره ترتیب برچسب‌ها ناموفق بود. لطفاً دوباره تلاش کنید.',
+      previewFailed:
+        'بررسی موجودی نمونه تست ناموفق بود. لطفاً دوباره تلاش کنید.',
+      invalidResponse: 'پاسخ پیش‌نمایش سرور نامعتبر بود.',
+      inputsChangedDuringRequest:
+        'پیکربندی نمونه تست هنگام درخواست تغییر کرد. دوباره موجودی را بررسی کنید.',
+      selectionOrderPending:
+        'تا هماهنگ‌شدن برچسب‌های انتخاب‌شده با ترتیب فعلی جدول منتظر بمانید.',
+      stale: 'پیش‌نمایش قبلی به‌دلیل تغییر ورودی‌های نمونه تست قدیمی شده است.',
+      previewRequired:
+        'برای تعیین مخاطبان مؤثر تست و هزینه، موجودی را بررسی کنید.',
+      unsatisfiedWarning:
+        'برچسب‌های زیر در حال حاضر مخاطب واجد شرایط کافی برای تأمین نمونه درخواستی ندارند و رد می‌شوند.',
+      availabilityLabel: 'مخاطب موجود',
+      tagLabel: 'برچسب',
+      estimateLimitation:
+        'این پیش‌نمایش موجودی فعلی مخاطبان را نشان می‌دهد. انتخاب نهایی مخاطبان تست هنگام اجرای زمان‌بند انجام می‌شود و در صورت تغییر موجودی ممکن است متفاوت باشد.',
     },
   },
 
