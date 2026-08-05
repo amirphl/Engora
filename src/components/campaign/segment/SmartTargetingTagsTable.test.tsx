@@ -106,14 +106,17 @@ const SelectionHarness: React.FC<{
   useCampaignEndpoints?: boolean;
   initialTagIds?: number[];
   selectionIsDirty?: boolean;
+  preserveSelectionOrder?: boolean;
 }> = ({
   campaignUuid,
   useCampaignEndpoints = false,
   initialTagIds = [],
   selectionIsDirty = false,
+  preserveSelectionOrder = false,
 }) => {
   const [selectedTagIds, setSelectedTagIds] = useState(initialTagIds);
   const [selectedRawCapacity, setSelectedRawCapacity] = useState(0);
+  const [orderPending, setOrderPending] = useState(false);
 
   return (
     <>
@@ -124,6 +127,8 @@ const SelectionHarness: React.FC<{
         selectedTagIds={selectedTagIds}
         selectedRawCapacity={selectedRawCapacity}
         selectionIsDirty={selectionIsDirty}
+        preserveSelectionOrder={preserveSelectionOrder}
+        onSelectionOrderSyncChange={setOrderPending}
         onSelectionChange={(ids, capacity) => {
           setSelectedTagIds(ids);
           setSelectedRawCapacity(capacity);
@@ -131,6 +136,7 @@ const SelectionHarness: React.FC<{
         copy={copy}
       />
       <output data-testid='selection'>{selectedTagIds.join(',')}</output>
+      <output data-testid='order-pending'>{String(orderPending)}</output>
     </>
   );
 };
@@ -172,6 +178,79 @@ describe('SmartTargetingTagsTable', () => {
       ).toBe(true);
     });
     expect(screen.getByTestId('selection').textContent).toContain('1,2');
+  });
+
+  it('keeps ordering pending until selected tags match the active table order', async () => {
+    mockedApiService.listBundleSmartTargetingTags.mockResolvedValue(
+      response(
+        [tag(2, 'Second tag', 20), tag(1, 'First tag', 10)],
+        1,
+        2,
+        1,
+        [1, 2],
+        30
+      ) as any
+    );
+
+    render(<SelectionHarness initialTagIds={[1, 2]} preserveSelectionOrder />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('order-pending').textContent).toBe('true')
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('selection').textContent).toBe('2,1')
+    );
+    expect(screen.getByTestId('order-pending').textContent).toBe('false');
+  });
+
+  it('keeps order synchronization active while search text changes', async () => {
+    let resolveOrderRequest: (value: any) => void = () => {};
+    let orderSignal: AbortSignal | undefined;
+    mockedApiService.listBundleSmartTargetingTags.mockImplementation(
+      async (_bundleId, params, signal) => {
+        if (params.page_size === 100) {
+          orderSignal = signal;
+          return new Promise(resolve => {
+            resolveOrderRequest = resolve;
+          });
+        }
+        return response(
+          [tag(1, 'First tag', 10), tag(2, 'Second tag', 20)],
+          1,
+          2,
+          1,
+          [1, 2],
+          30
+        ) as any;
+      }
+    );
+
+    render(<SelectionHarness initialTagIds={[1, 2]} preserveSelectionOrder />);
+
+    await waitFor(() => expect(orderSignal).toBeDefined());
+    await change(
+      screen.getByRole('searchbox', { name: copy.searchLabel }),
+      'First'
+    );
+    expect(orderSignal?.aborted).toBe(false);
+
+    await act(async () => {
+      resolveOrderRequest(
+        response(
+          [tag(1, 'First tag', 10), tag(2, 'Second tag', 20)],
+          1,
+          2,
+          1,
+          [1, 2],
+          30
+        )
+      );
+      await Promise.resolve();
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId('order-pending').textContent).toBe('false')
+    );
   });
 
   it('loads and appends the next page when the table viewport is scrolled', async () => {
@@ -375,5 +454,43 @@ describe('SmartTargetingTagsTable', () => {
     await waitFor(() => {
       expect(screen.getByTestId('selection').textContent).toContain('1');
     });
+  });
+
+  it('reorders selected Test tags to the active table sort order', async () => {
+    mockedApiService.listBundleSmartTargetingTags.mockImplementation(
+      async (_bundleId, params) =>
+        Promise.resolve(
+          response(
+            params.sort_by === 'tag_capacity'
+              ? [tag(2, 'Second tag', 20), tag(1, 'First tag', 10)]
+              : [tag(1, 'First tag', 10), tag(2, 'Second tag', 20)],
+            1,
+            2,
+            1,
+            [1, 2],
+            30
+          )
+        ) as any
+    );
+
+    render(
+      <SelectionHarness
+        initialTagIds={[1, 2]}
+        preserveSelectionOrder
+        selectionIsDirty
+      />
+    );
+    await screen.findByRole('checkbox', { name: 'First tag' });
+    await change(
+      screen.getByRole('combobox', { name: copy.sortByLabel }),
+      'tag_capacity'
+    );
+
+    await waitFor(
+      () => {
+        expect(screen.getByTestId('selection').textContent).toBe('2,1');
+      },
+      { timeout: 2000 }
+    );
   });
 });
