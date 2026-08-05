@@ -16,7 +16,9 @@ import {
   AudienceTargetingMethod,
   AudienceGrade,
   CampaignPlatform,
+  CreateSMSCampaignResponse,
 } from '../types/campaign';
+import type { ApiResponse } from '../services/api';
 import { registerCampaignClearFunction } from './useAuth';
 import { clearLevelSelection } from '../types/segment';
 import {
@@ -26,6 +28,15 @@ import {
   normalizeLinkPlaceholder,
   validateCampaignContent,
 } from '../utils/campaignUtils';
+import {
+  isCurrentUsableSmartTargetingCapacity,
+  normalizeSmartTargetingCapacityCalculation,
+} from '../utils/smartTargetingCapacity';
+import {
+  DEFAULT_SMART_TARGETING_TEST_SAMPLE_SIZE,
+  getSmartTargetingTestPreviewInputKey,
+  hasUsableSmartTargetingTestPreview,
+} from '../utils/smartTargetingTestPreview';
 
 interface CampaignContextType {
   currentStep: number;
@@ -47,6 +58,10 @@ interface CampaignContextType {
   // UUID management
   setCampaignId: (id: number | undefined) => void;
   setCampaignUuid: (uuid: string) => void;
+  ensureCampaignCreated: (
+    create: () => Promise<ApiResponse<CreateSMSCampaignResponse>>
+  ) => Promise<ApiResponse<CreateSMSCampaignResponse>>;
+  isCampaignCreationPending: boolean;
 
   // Storage management
   saveCampaignData: () => void;
@@ -157,6 +172,17 @@ const createDefaultCampaignData = (): CampaignData => ({
     selectedTagIds: [],
     smartTargetingSelectedRawCapacity: 0,
     smartTargetingSelectionDirty: false,
+    smartTargetingScoreClasses: [],
+    smartTargetingScoreClassesDirty: false,
+    smartTargetingCapacityCalculation: null,
+    smartTargetingExactCapacityRequired: false,
+    smartTargetingSortBy: '',
+    smartTargetingSortDirection: 'desc',
+    smartTargetingSelectionOrderPending: false,
+    sampleSizePerTag: DEFAULT_SMART_TARGETING_TEST_SAMPLE_SIZE,
+    smartTargetingTestPreview: null,
+    smartTargetingTestPreviewInputKey: null,
+    smartTargetingTestPreviewStale: false,
     capacityTooLow: false,
     capacity: undefined,
     audienceGrades: [],
@@ -262,6 +288,40 @@ const normalizeStoredCampaignData = (value: unknown): CampaignData => {
         typeof storedSegment.smartTargetingSelectionDirty === 'boolean'
           ? storedSegment.smartTargetingSelectionDirty
           : normalizedSelectedTagIds.length > 0,
+      smartTargetingScoreClasses: normalizeAudienceGrades(
+        storedSegment.smartTargetingScoreClasses
+      ),
+      smartTargetingScoreClassesDirty:
+        typeof storedSegment.smartTargetingScoreClassesDirty === 'boolean'
+          ? storedSegment.smartTargetingScoreClassesDirty
+          : false,
+      smartTargetingCapacityCalculation:
+        normalizeSmartTargetingCapacityCalculation(
+          storedSegment.smartTargetingCapacityCalculation
+        ),
+      smartTargetingExactCapacityRequired:
+        storedSegment.smartTargetingExactCapacityRequired === true,
+      smartTargetingSortBy:
+        storedSegment.smartTargetingSortBy === 'tag_capacity' ||
+        storedSegment.smartTargetingSortBy === 'bundle_persona_fit_score' ||
+        storedSegment.smartTargetingSortBy === 'test_phase_avg_ctr' ||
+        storedSegment.smartTargetingSortBy === 'overall_avg_ctr'
+          ? storedSegment.smartTargetingSortBy
+          : '',
+      smartTargetingSortDirection:
+        storedSegment.smartTargetingSortDirection === 'asc' ? 'asc' : 'desc',
+      smartTargetingSelectionOrderPending: false,
+      sampleSizePerTag:
+        typeof storedSegment.sampleSizePerTag === 'number' &&
+        Number.isSafeInteger(storedSegment.sampleSizePerTag) &&
+        storedSegment.sampleSizePerTag > 0
+          ? storedSegment.sampleSizePerTag
+          : defaults.segment.sampleSizePerTag,
+      // Availability previews are intentionally session-only estimates. A
+      // page reload must require a fresh backend check.
+      smartTargetingTestPreview: null,
+      smartTargetingTestPreviewInputKey: null,
+      smartTargetingTestPreviewStale: false,
       capacityTooLow:
         typeof storedSegment.capacityTooLow === 'boolean'
           ? storedSegment.capacityTooLow
@@ -337,10 +397,13 @@ const normalizeStoredCampaignData = (value: unknown): CampaignData => {
     },
     budget: {
       totalBudget:
-        typeof storedBudget.totalBudget === 'number' &&
-        Number.isFinite(storedBudget.totalBudget)
-          ? Math.max(0, storedBudget.totalBudget)
-          : defaults.budget.totalBudget,
+        normalizeAudienceTargetingMethod(storedSegment) === 'smart_targeting' &&
+        storedSegment.phase === 'test'
+          ? 0
+          : typeof storedBudget.totalBudget === 'number' &&
+              Number.isFinite(storedBudget.totalBudget)
+            ? Math.max(0, storedBudget.totalBudget)
+            : defaults.budget.totalBudget,
       estimatedMessages: undefined,
     },
     payment: {
@@ -361,8 +424,18 @@ const normalizeStoredCampaignData = (value: unknown): CampaignData => {
 
 const getStoredCampaignData = (data: CampaignData): CampaignData => ({
   ...data,
+  segment: {
+    ...data.segment,
+    smartTargetingTestPreview: null,
+    smartTargetingTestPreviewInputKey: null,
+    smartTargetingTestPreviewStale: false,
+  },
   budget: {
-    totalBudget: data.budget.totalBudget,
+    totalBudget:
+      data.segment.audienceTargetingMethod === 'smart_targeting' &&
+      data.segment.phase === 'test'
+        ? 0
+        : data.budget.totalBudget,
     estimatedMessages: undefined,
   },
   payment: {
@@ -414,10 +487,18 @@ export const CampaignProvider: React.FC<CampaignProviderProps> = ({
   });
 
   const [error, setError] = useState<string | null>(null);
+  const [isCampaignCreationPending, setIsCampaignCreationPending] =
+    useState(false);
   const skipNextCampaignPersistenceRef = useRef(false);
   const skipNextStepPersistenceRef = useRef(false);
   const currentStepRef = useRef(currentStep);
+  const campaignDataRef = useRef(campaignData);
+  const campaignCreationPromiseRef = useRef<Promise<
+    ApiResponse<CreateSMSCampaignResponse>
+  > | null>(null);
+  const campaignGenerationRef = useRef(0);
   currentStepRef.current = currentStep;
+  campaignDataRef.current = campaignData;
 
   // Auto-save campaign data to localStorage whenever it changes
   useEffect(() => {
@@ -463,12 +544,42 @@ export const CampaignProvider: React.FC<CampaignProviderProps> = ({
   const updateLevel = useCallback((data: Partial<CampaignSegment>) => {
     setCampaignData(prev => {
       const derivedState = invalidateDerivedCampaignState(prev);
+      const nextSegment: CampaignSegment = {
+        ...prev.segment,
+        ...data,
+      };
+      const explicitlySettingPreview = Object.prototype.hasOwnProperty.call(
+        data,
+        'smartTargetingTestPreview'
+      );
+      const isEnteringSmartTargetingTest =
+        nextSegment.audienceTargetingMethod === 'smart_targeting' &&
+        nextSegment.phase === 'test' &&
+        (prev.segment.audienceTargetingMethod !== 'smart_targeting' ||
+          prev.segment.phase !== 'test');
+      const previewInputsChanged =
+        getSmartTargetingTestPreviewInputKey(prev.uuid, prev.segment) !==
+        getSmartTargetingTestPreviewInputKey(prev.uuid, nextSegment);
+      const shouldInvalidateTestPreview =
+        !explicitlySettingPreview &&
+        previewInputsChanged &&
+        (prev.segment.smartTargetingTestPreview !== null ||
+          prev.segment.smartTargetingTestPreviewInputKey !== null);
+
+      if (shouldInvalidateTestPreview) {
+        nextSegment.smartTargetingTestPreview = null;
+        nextSegment.smartTargetingTestPreviewInputKey = null;
+        nextSegment.smartTargetingTestPreviewStale = true;
+        derivedState.budget.totalBudget = 0;
+      }
+      if (isEnteringSmartTargetingTest && !explicitlySettingPreview) {
+        nextSegment.smartTargetingTestPreview = null;
+        nextSegment.smartTargetingTestPreviewInputKey = null;
+        derivedState.budget.totalBudget = 0;
+      }
       const updatedData = {
         ...prev,
-        segment: {
-          ...prev.segment,
-          ...data,
-        },
+        segment: nextSegment,
         ...derivedState,
       };
       return updatedData;
@@ -478,13 +589,29 @@ export const CampaignProvider: React.FC<CampaignProviderProps> = ({
   const updateContent = useCallback((data: Partial<CampaignContent>) => {
     setCampaignData(prev => {
       const derivedState = invalidateDerivedCampaignState(prev);
+      const shouldInvalidateTestPreview =
+        prev.segment.audienceTargetingMethod === 'smart_targeting' &&
+        prev.segment.phase === 'test' &&
+        (prev.segment.smartTargetingTestPreview !== null ||
+          prev.segment.smartTargetingTestPreviewInputKey !== null);
       const updatedData = {
         ...prev,
+        segment: shouldInvalidateTestPreview
+          ? {
+              ...prev.segment,
+              smartTargetingTestPreview: null,
+              smartTargetingTestPreviewInputKey: null,
+              smartTargetingTestPreviewStale: true,
+            }
+          : prev.segment,
         content: {
           ...prev.content,
           ...data,
         },
-        ...derivedState,
+        budget: shouldInvalidateTestPreview
+          ? { ...derivedState.budget, totalBudget: 0 }
+          : derivedState.budget,
+        payment: derivedState.payment,
       };
       return updatedData;
     });
@@ -520,7 +647,10 @@ export const CampaignProvider: React.FC<CampaignProviderProps> = ({
 
   const replaceCampaignData = useCallback(
     (data: CampaignData, step: number = 1) => {
-      setCampaignData(normalizeStoredCampaignData(data));
+      campaignGenerationRef.current += 1;
+      const normalized = normalizeStoredCampaignData(data);
+      campaignDataRef.current = normalized;
+      setCampaignData(normalized);
       setCurrentStep(
         Number.isInteger(step) && step >= 1 && step <= 4 ? step : 1
       );
@@ -531,10 +661,42 @@ export const CampaignProvider: React.FC<CampaignProviderProps> = ({
 
   const setCampaignUuid = useCallback((uuid: string) => {
     setCampaignData(prev => {
+      const nextUuid = uuid.trim();
+      const campaignContextChanged = prev.uuid !== nextUuid;
+      const shouldClearTestEstimate =
+        campaignContextChanged &&
+        prev.segment.audienceTargetingMethod === 'smart_targeting' &&
+        prev.segment.phase === 'test';
       const updatedData = {
         ...prev,
-        uuid: uuid.trim(),
+        uuid: nextUuid,
+        segment: campaignContextChanged
+          ? {
+              ...prev.segment,
+              smartTargetingTestPreview: null,
+              smartTargetingTestPreviewInputKey: null,
+              smartTargetingTestPreviewStale:
+                prev.segment.smartTargetingTestPreview !== null ||
+                prev.segment.smartTargetingTestPreviewInputKey !== null,
+            }
+          : prev.segment,
+        budget: shouldClearTestEstimate
+          ? {
+              ...prev.budget,
+              totalBudget: 0,
+              estimatedMessages: undefined,
+            }
+          : prev.budget,
+        payment: campaignContextChanged
+          ? {
+              ...prev.payment,
+              hasEnoughBalance: undefined,
+              finalCost: undefined,
+              total: undefined,
+            }
+          : prev.payment,
       };
+      campaignDataRef.current = updatedData;
       return updatedData;
     });
   }, []);
@@ -545,17 +707,92 @@ export const CampaignProvider: React.FC<CampaignProviderProps> = ({
         ...prev,
         id,
       };
+      campaignDataRef.current = updatedData;
       return updatedData;
     });
   }, []);
 
+  const ensureCampaignCreated = useCallback(
+    (
+      create: () => Promise<ApiResponse<CreateSMSCampaignResponse>>
+    ): Promise<ApiResponse<CreateSMSCampaignResponse>> => {
+      const current = campaignDataRef.current;
+      if (current.uuid.trim()) {
+        return Promise.resolve({
+          success: true,
+          message: 'Campaign already exists',
+          data: {
+            message: 'Campaign already exists',
+            id: current.id ?? 0,
+            uuid: current.uuid.trim(),
+            status: 'initiated',
+            created_at: '',
+          },
+        });
+      }
+
+      if (campaignCreationPromiseRef.current) {
+        return campaignCreationPromiseRef.current;
+      }
+
+      const generation = campaignGenerationRef.current;
+      setIsCampaignCreationPending(true);
+      const request = create()
+        .then(response => {
+          if (campaignGenerationRef.current !== generation) {
+            return response.success
+              ? {
+                  success: false,
+                  message: 'Campaign context changed during creation',
+                  error: {
+                    code: 'CAMPAIGN_CONTEXT_CHANGED',
+                    details: null,
+                  },
+                }
+              : response;
+          }
+          const id = response.data?.id;
+          const uuid = response.data?.uuid?.trim();
+          if (
+            response.success &&
+            uuid &&
+            Number.isInteger(id) &&
+            (id ?? 0) > 0
+          ) {
+            const updatedData: CampaignData = {
+              ...campaignDataRef.current,
+              id,
+              uuid,
+            };
+            campaignDataRef.current = updatedData;
+            setCampaignData(updatedData);
+          }
+          return response;
+        })
+        .finally(() => {
+          if (campaignCreationPromiseRef.current === request) {
+            campaignCreationPromiseRef.current = null;
+            setIsCampaignCreationPending(false);
+          }
+        });
+
+      campaignCreationPromiseRef.current = request;
+      return request;
+    },
+    []
+  );
+
   const resetCampaign = useCallback(() => {
+    if (campaignCreationPromiseRef.current) return;
+    campaignGenerationRef.current += 1;
     if (currentStepRef.current !== 1) {
       skipNextStepPersistenceRef.current = true;
     }
     setCurrentStep(1);
     skipNextCampaignPersistenceRef.current = true;
-    setCampaignData(createDefaultCampaignData());
+    const nextData = createDefaultCampaignData();
+    campaignDataRef.current = nextData;
+    setCampaignData(nextData);
     setError(null);
 
     // Clear localStorage
@@ -580,6 +817,7 @@ export const CampaignProvider: React.FC<CampaignProviderProps> = ({
 
   // Comprehensive cleanup function for logout scenarios
   const clearAllCampaignData = useCallback(() => {
+    campaignGenerationRef.current += 1;
     // Clear localStorage (includes level selection storage)
     clearCampaignData();
 
@@ -589,7 +827,9 @@ export const CampaignProvider: React.FC<CampaignProviderProps> = ({
     }
     setCurrentStep(1);
     skipNextCampaignPersistenceRef.current = true;
-    setCampaignData(createDefaultCampaignData());
+    const nextData = createDefaultCampaignData();
+    campaignDataRef.current = nextData;
+    setCampaignData(nextData);
     setError(null);
   }, [clearCampaignData]);
 
@@ -624,6 +864,8 @@ export const CampaignProvider: React.FC<CampaignProviderProps> = ({
       (targetAudienceExcelFileUuid != null ? 'excel' : 'standard');
     const isTargetAudienceExcelFileMode = audienceTargetingMethod === 'excel';
     const isSmartTargetingMode = audienceTargetingMethod === 'smart_targeting';
+    const isSmartTargetingTest =
+      isSmartTargetingMode && campaignData.segment.phase === 'test';
     const excelFileUploaded = isUuidV4(targetAudienceExcelFileUuid);
     const audienceGradesValid =
       (campaignData.segment.audienceGrades?.length ?? 0) <= 3 &&
@@ -640,7 +882,17 @@ export const CampaignProvider: React.FC<CampaignProviderProps> = ({
       ) &&
       new Set(campaignData.segment.selectedTagIds ?? []).size ===
         (campaignData.segment.selectedTagIds?.length ?? 0) &&
-      (campaignData.segment.smartTargetingSelectedRawCapacity ?? 0) >= 500;
+      (isSmartTargetingTest ||
+        (campaignData.segment.smartTargetingSelectedRawCapacity ?? 0) >= 500);
+    const exactCapacityRequirementSatisfied =
+      isSmartTargetingTest ||
+      campaignData.segment.smartTargetingExactCapacityRequired !== true ||
+      (campaignData.segment.smartTargetingSelectionDirty !== true &&
+        isCurrentUsableSmartTargetingCapacity(
+          campaignData.segment.smartTargetingCapacityCalculation,
+          campaignData.segment.selectedTagIds,
+          campaignData.segment.smartTargetingScoreClasses
+        ));
     if (
       campaignData.segment.campaignTitle.trim() &&
       campaignData.segment.campaignTitle.length <= MAX_CAMPAIGN_STRING_LENGTH &&
@@ -661,7 +913,7 @@ export const CampaignProvider: React.FC<CampaignProviderProps> = ({
           (campaignData.segment.capacity ?? 0) >= 500 &&
           campaignData.segment.capacityTooLow !== true
         : isSmartTargetingMode
-          ? hasSmartTargetingSelection
+          ? hasSmartTargetingSelection && exactCapacityRequirementSatisfied
           : excelFileUploaded) &&
       audienceGradesValid &&
       (!campaignData.segment.sex ||
@@ -677,7 +929,11 @@ export const CampaignProvider: React.FC<CampaignProviderProps> = ({
           campaignData.segment.job.length <= MAX_CAMPAIGN_STRING_LENGTH)) &&
       campaignData.segment.bundleId &&
       (campaignData.segment.phase === 'test' ||
-        campaignData.segment.phase === 'execution')
+        campaignData.segment.phase === 'execution') &&
+      (!isSmartTargetingTest ||
+        (Number.isSafeInteger(campaignData.segment.sampleSizePerTag) &&
+          (campaignData.segment.sampleSizePerTag ?? 0) > 0 &&
+          campaignData.segment.smartTargetingSelectionOrderPending !== true))
     ) {
       completedSteps++;
     }
@@ -692,13 +948,33 @@ export const CampaignProvider: React.FC<CampaignProviderProps> = ({
     ) {
       completedSteps++;
     }
+    const hasSmartTargetingTestBudget =
+      isSmartTargetingTest &&
+      hasUsableSmartTargetingTestPreview(campaignData) &&
+      campaignData.budget.totalBudget ===
+        campaignData.segment.smartTargetingTestPreview?.campaign_cost;
+    const hasSmartTargetingExecutionAudience =
+      !isSmartTargetingMode ||
+      isSmartTargetingTest ||
+      !isCurrentUsableSmartTargetingCapacity(
+        campaignData.segment.smartTargetingCapacityCalculation,
+        campaignData.segment.selectedTagIds,
+        campaignData.segment.smartTargetingScoreClasses
+      ) ||
+      (Number.isSafeInteger(campaignData.budget.estimatedMessages) &&
+        (campaignData.budget.estimatedMessages ?? 0) <=
+          (campaignData.segment.smartTargetingCapacityCalculation
+            ?.usable_unique_audience_count ?? 0));
     if (
       (campaignData.segment.platform === 'sms'
         ? campaignData.content.lineNumber
         : campaignData.content.platformSettingsId) &&
-      Number.isInteger(campaignData.budget.totalBudget) &&
-      campaignData.budget.totalBudget >= 100000 &&
-      campaignData.budget.totalBudget <= 160000000
+      (isSmartTargetingTest
+        ? hasSmartTargetingTestBudget
+        : Number.isInteger(campaignData.budget.totalBudget) &&
+          campaignData.budget.totalBudget >= 100000 &&
+          campaignData.budget.totalBudget <= 160000000 &&
+          hasSmartTargetingExecutionAudience)
     ) {
       completedSteps++;
     }
@@ -734,6 +1010,8 @@ export const CampaignProvider: React.FC<CampaignProviderProps> = ({
     replaceCampaignData,
     setCampaignId,
     setCampaignUuid,
+    ensureCampaignCreated,
+    isCampaignCreationPending,
     saveCampaignData,
     clearCampaignData,
     clearAllCampaignData,
