@@ -11,6 +11,7 @@ import { useCostCalculation } from './useCostCalculation';
 import { useWalletBalance } from './useWalletBalance';
 import { paymentI18n } from './paymentTranslations';
 import { useLineNumbers } from '../content/useLineNumbers';
+import { isCurrentUsableSmartTargetingCapacity } from '../../../utils/smartTargetingCapacity';
 
 const PaymentStep: React.FC = () => {
   const { campaignData, updatePayment } = useCampaign();
@@ -92,6 +93,11 @@ const PaymentStep: React.FC = () => {
       ? (campaignData.segment.selectedTagIds?.length ?? 0) > 0 &&
         campaignData.segment.selectedTagIds?.every(
           tagId => Number.isInteger(tagId) && tagId > 0
+        ) &&
+        isCurrentUsableSmartTargetingCapacity(
+          campaignData.segment.smartTargetingCapacityCalculation,
+          campaignData.segment.selectedTagIds,
+          campaignData.segment.smartTargetingScoreClasses
         )
       : audienceTargetingMethod === 'excel'
         ? typeof campaignData.segment.targetAudienceExcelFileUuid ===

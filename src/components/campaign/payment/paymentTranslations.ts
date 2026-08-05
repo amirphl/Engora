@@ -15,6 +15,10 @@ const paymentEn = {
   completeDetailsMessage: 'Complete campaign details to see cost breakdown',
   campaignIdRequiredForCostCalculation:
     'Campaign ID is missing. Please create the campaign again before calculating costs.',
+  exactCapacityRequiredForCostCalculation:
+    'Calculate the current exact Smart Targeting capacity before calculating costs.',
+  zeroExactCapacity:
+    'No usable Smart Targeting audience is available for cost calculation.',
   note: 'Note:',
   costPerMessage: 'Cost per message',
   linePriceFactor: 'Line price factor',
@@ -51,6 +55,10 @@ const paymentFa = {
   completeDetailsMessage: 'جزئیات کمپین را تکمیل کنید تا تجزیه هزینه را ببینید',
   campaignIdRequiredForCostCalculation:
     'شناسه کمپین موجود نیست. لطفاً پیش از محاسبه هزینه‌ها، دوباره کمپین را ایجاد کنید.',
+  exactCapacityRequiredForCostCalculation:
+    'پیش از محاسبه هزینه، ظرفیت دقیق فعلی هدف‌گیری هوشمند را محاسبه کنید.',
+  zeroExactCapacity:
+    'برای محاسبه هزینه، مخاطب قابل استفاده‌ای در هدف‌گیری هوشمند موجود نیست.',
   note: 'توجه:',
   costPerMessage: 'تعرفه هر پیام ارسالی شما',
   linePriceFactor: 'ضریب خط ارسالی',

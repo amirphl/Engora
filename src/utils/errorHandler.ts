@@ -246,6 +246,46 @@ export const ERROR_MESSAGES: Record<string, ErrorMessage> = {
     en: 'Failed to automatically select Smart Targeting tags. Please try again',
     fa: 'انتخاب خودکار برچسب‌های هدف‌گیری هوشمند ناموفق بود. لطفاً دوباره تلاش کنید',
   },
+  SMART_TARGETING_SCORE_CLASSES_INVALID: {
+    en: 'One or more selected audience score classes are invalid',
+    fa: 'یک یا چند کلاس نمره مخاطب انتخاب‌شده نامعتبر است',
+  },
+  SMART_TARGETING_CAPACITY_UNAVAILABLE: {
+    en: 'Exact capacity calculation is currently unavailable',
+    fa: 'محاسبه ظرفیت دقیق در حال حاضر در دسترس نیست',
+  },
+  SMART_TARGETING_CAPACITY_REQUEST_FAILED: {
+    en: 'Failed to request the exact-capacity calculation. Please try again',
+    fa: 'ثبت درخواست محاسبه ظرفیت دقیق ناموفق بود. لطفاً دوباره تلاش کنید',
+  },
+  SMART_TARGETING_CAPACITY_LOOKUP_FAILED: {
+    en: 'Failed to load the exact-capacity calculation. Please try again',
+    fa: 'بارگذاری محاسبه ظرفیت دقیق ناموفق بود. لطفاً دوباره تلاش کنید',
+  },
+  SMART_TARGETING_CAPACITY_CALCULATION_NOT_FOUND: {
+    en: 'The exact-capacity calculation could not be found',
+    fa: 'محاسبه ظرفیت دقیق موردنظر یافت نشد',
+  },
+  SMART_TARGETING_CAPACITY_CALCULATION_ACTIVE: {
+    en: 'An exact-capacity calculation is already in progress',
+    fa: 'یک محاسبه ظرفیت دقیق هم‌اکنون در حال انجام است',
+  },
+  SMART_TARGETING_CAPACITY_RECALCULATION_REQUIRED: {
+    en: 'This capacity result is no longer valid. Recalculate it',
+    fa: 'این نتیجه ظرفیت دیگر معتبر نیست. آن را دوباره محاسبه کنید',
+  },
+  SMART_TARGETING_CAPACITY_FAILED: {
+    en: 'Exact-capacity calculation failed. Please try again',
+    fa: 'محاسبه ظرفیت دقیق با خطا مواجه شد. لطفاً دوباره تلاش کنید',
+  },
+  SMART_TARGETING_APPROVED_ALLOCATION_FAILED: {
+    en: 'Approved Campaign allocations could not be applied to the capacity',
+    fa: 'اعمال تخصیص کمپین‌های تأییدشده بر ظرفیت ناموفق بود',
+  },
+  INVALID_CALCULATION_ID: {
+    en: 'The capacity calculation ID is invalid',
+    fa: 'شناسه محاسبه ظرفیت نامعتبر است',
+  },
 
   // Bundle errors
   INVALID_BUNDLE_ID: {

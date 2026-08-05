@@ -31,6 +31,7 @@ import {
   CampaignData,
   CampaignPhase,
   CampaignPlatform,
+  SmartTargetingCapacityCalculationResponse,
 } from '../../../types/campaign';
 import { getLayer3Stat, calcGradeCapacity } from '../../../data/layer3Stats';
 import { campaignLevelI18n } from './segmentTranslations';
@@ -44,6 +45,7 @@ import TargetAudienceExcelFileUploadCard, {
 } from './TargetAudienceExcelFileUploadCard';
 import BundleInfoCard from '../content/BundleInfoCard';
 import SmartTargetingTagsTable from './SmartTargetingTagsTable';
+import SmartTargetingExactCapacity from './SmartTargetingExactCapacity';
 import {
   normalizeCampaignResponseToDraft,
   type SmartTargetingDraftSelection,
@@ -400,6 +402,8 @@ const LevelStep: React.FC = () => {
           selectedTagIds: normalized.segment.selectedTagIds ?? [],
           smartTargetingSelectedRawCapacity:
             normalized.segment.smartTargetingSelectedRawCapacity ?? 0,
+          smartTargetingScoreClasses:
+            normalized.segment.smartTargetingScoreClasses ?? [],
           metadata: {},
           tags: normalized.segment.tags || [],
           count: normalized.segment.capacity || 0,
@@ -725,6 +729,8 @@ const LevelStep: React.FC = () => {
       selectedTagIds: campaignData.segment.selectedTagIds ?? [],
       smartTargetingSelectedRawCapacity:
         campaignData.segment.smartTargetingSelectedRawCapacity ?? 0,
+      smartTargetingScoreClasses:
+        campaignData.segment.smartTargetingScoreClasses ?? [],
       metadata: metadata,
       tags: Array.from(tags),
       count: selectedGradeCapacity,
@@ -761,6 +767,7 @@ const LevelStep: React.FC = () => {
     audienceTargetingMethod,
     campaignData.segment.selectedTagIds,
     campaignData.segment.smartTargetingSelectedRawCapacity,
+    campaignData.segment.smartTargetingScoreClasses,
     campaignData.segment.targetAudienceExcelFileUuid,
     campaignTitle,
     jobCategory,
@@ -786,6 +793,9 @@ const LevelStep: React.FC = () => {
             selectedTagIds: [],
             smartTargetingSelectedRawCapacity: 0,
             smartTargetingSelectionDirty: false,
+            smartTargetingScoreClasses: [],
+            smartTargetingScoreClassesDirty: false,
+            smartTargetingCapacityCalculation: null,
           }
         : {}),
     });
@@ -814,6 +824,8 @@ const LevelStep: React.FC = () => {
       audienceTargetingMethod: method,
       selectedTagIds,
       smartTargetingSelectedRawCapacity: selectedRawCapacity,
+      smartTargetingScoreClasses:
+        campaignData.segment.smartTargetingScoreClasses ?? [],
       count:
         method === 'smart_targeting'
           ? selectedRawCapacity
@@ -848,6 +860,35 @@ const LevelStep: React.FC = () => {
     });
     persistTargetingSelection('smart_targeting', tagIds, selectedRawCapacity);
   };
+
+  const handleCapacitySelectionPersisted = useCallback(
+    (tagIds: number[], selectedRawCapacity: number) => {
+      updateLevel({
+        audienceTargetingMethod: 'smart_targeting',
+        selectedTagIds: tagIds,
+        smartTargetingSelectedRawCapacity: selectedRawCapacity,
+        smartTargetingSelectionDirty: false,
+      });
+    },
+    [updateLevel]
+  );
+
+  const handleSmartTargetingScoreClassesChange = useCallback(
+    (scoreClasses: AudienceGrade[], source: 'local' | 'server') => {
+      updateLevel({
+        smartTargetingScoreClasses: scoreClasses,
+        smartTargetingScoreClassesDirty: source === 'local',
+      });
+    },
+    [updateLevel]
+  );
+
+  const handleSmartTargetingCalculationChange = useCallback(
+    (calculation: SmartTargetingCapacityCalculationResponse | null) => {
+      updateLevel({ smartTargetingCapacityCalculation: calculation });
+    },
+    [updateLevel]
+  );
 
   const handleSegmentationModeChange = (
     mode: 'target-audience-excel-file' | 'levels' | 'smart-targeting'
@@ -1078,6 +1119,9 @@ const LevelStep: React.FC = () => {
       selectedTagIds: [],
       smartTargetingSelectedRawCapacity: 0,
       smartTargetingSelectionDirty: false,
+      smartTargetingScoreClasses: [],
+      smartTargetingScoreClassesDirty: false,
+      smartTargetingCapacityCalculation: null,
       capacity: 0,
       capacityTooLow: false,
       audienceGrades: [],
@@ -1253,6 +1297,30 @@ const LevelStep: React.FC = () => {
               }
               onSelectionChange={handleSmartTargetingSelectionChange}
               copy={t.smartTargeting}
+            />
+            <SmartTargetingExactCapacity
+              key={campaignData.uuid || 'unsaved-campaign'}
+              campaignUuid={campaignData.uuid || undefined}
+              selectedTagIds={campaignData.segment.selectedTagIds || []}
+              selectedRawCapacity={
+                campaignData.segment.smartTargetingSelectedRawCapacity || 0
+              }
+              selectionIsDirty={
+                campaignData.segment.smartTargetingSelectionDirty === true
+              }
+              selectedScoreClasses={
+                campaignData.segment.smartTargetingScoreClasses || []
+              }
+              scoreClassesAreDirty={
+                campaignData.segment.smartTargetingScoreClassesDirty === true
+              }
+              initialCalculation={
+                campaignData.segment.smartTargetingCapacityCalculation
+              }
+              onSelectionPersisted={handleCapacitySelectionPersisted}
+              onScoreClassesChange={handleSmartTargetingScoreClassesChange}
+              onCalculationChange={handleSmartTargetingCalculationChange}
+              copy={t.smartTargeting.exactCapacity}
             />
             {(campaignData.segment.selectedTagIds?.length ?? 0) === 0 ? (
               <p className='mt-2 text-sm text-red-600'>

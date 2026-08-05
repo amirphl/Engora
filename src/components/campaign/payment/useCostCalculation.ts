@@ -5,6 +5,7 @@ import { useAuth } from '../../../hooks/useAuth';
 import { useToast } from '../../../hooks/useToast';
 import { useLanguage } from '../../../hooks/useLanguage';
 import { paymentI18n } from './paymentTranslations';
+import { isCurrentUsableSmartTargetingCapacity } from '../../../utils/smartTargetingCapacity';
 
 export const useCostCalculation = (
   campaignData: CampaignData,
@@ -61,6 +62,13 @@ export const useCostCalculation = (
       campaignData.segment.targetAudienceExcelFileUuid || null;
     const tags = campaignData.segment.tags || [];
     const selectedTagIds = campaignData.segment.selectedTagIds || [];
+    const exactCapacity =
+      campaignData.segment.smartTargetingCapacityCalculation;
+    const hasCurrentExactCapacity = isCurrentUsableSmartTargetingCapacity(
+      exactCapacity,
+      selectedTagIds,
+      campaignData.segment.smartTargetingScoreClasses
+    );
     const adlink = campaignData.content.insertLink
       ? campaignData.content.link
       : '';
@@ -98,7 +106,8 @@ export const useCostCalculation = (
     const hasAudienceSelection =
       audienceTargetingMethod === 'smart_targeting'
         ? selectedTagIds.length > 0 &&
-          selectedTagIds.every(tagId => Number.isInteger(tagId) && tagId > 0)
+          selectedTagIds.every(tagId => Number.isInteger(tagId) && tagId > 0) &&
+          hasCurrentExactCapacity
         : audienceTargetingMethod === 'excel'
           ? typeof target_audience_excel_file_uuid === 'string' &&
             target_audience_excel_file_uuid.trim().length > 0
@@ -116,6 +125,15 @@ export const useCostCalculation = (
       budget <= 0
     ) {
       clearCalculation();
+      return;
+    }
+    if (
+      audienceTargetingMethod === 'smart_targeting' &&
+      hasCurrentExactCapacity &&
+      exactCapacity?.usable_unique_audience_count === 0
+    ) {
+      clearCalculation();
+      setError(t.zeroExactCapacity);
       return;
     }
     if (
@@ -151,6 +169,13 @@ export const useCostCalculation = (
       target_audience_excel_file_uuid || '',
       [...tags].sort().join(','),
       [...selectedTagIds].sort((a, b) => a - b).join(','),
+      [...(campaignData.segment.smartTargetingScoreClasses || [])]
+        .sort()
+        .join(','),
+      exactCapacity ? String(exactCapacity.calculation_id) : '',
+      exactCapacity?.usable_unique_audience_count !== undefined
+        ? String(exactCapacity.usable_unique_audience_count)
+        : '',
       [...(campaignData.segment.audienceGrades || [])].sort().join(','),
       campaignData.content.insertLink ? 'link:on' : 'link:off',
       adlink || '',

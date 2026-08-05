@@ -23,6 +23,8 @@ import {
   ListSMSCampaignsResponse,
   ReplaceSmartTargetingSelectionRequest,
   SmartTargetingSelectionResponse,
+  SmartTargetingCapacityCalculationResponse,
+  StartSmartTargetingCapacityCalculationRequest,
   UploadMultimediaResponse,
 } from '../types/campaign';
 import {
@@ -1212,6 +1214,87 @@ class ApiService {
           ? { sort_direction: payload.sort_direction }
           : {}),
       }),
+      signal,
+    });
+  }
+
+  async startSmartTargetingCapacityCalculation(
+    uuid: string,
+    payload: StartSmartTargetingCapacityCalculationRequest = {},
+    signal?: AbortSignal
+  ): Promise<ApiResponse<SmartTargetingCapacityCalculationResponse>> {
+    if (!uuid || typeof uuid !== 'string' || !uuid.trim()) {
+      return this.createErrorResponse('INVALID_CAMPAIGN_UUID');
+    }
+
+    const scoreClasses = Array.isArray(payload.score_classes)
+      ? Array.from(
+          new Set(
+            payload.score_classes.map(value =>
+              typeof value === 'string' ? value.toUpperCase() : value
+            )
+          )
+        )
+      : [];
+    if (
+      scoreClasses.length > 3 ||
+      scoreClasses.some(value => !['A', 'B', 'C'].includes(value))
+    ) {
+      return this.createErrorResponse('SMART_TARGETING_SCORE_CLASSES_INVALID');
+    }
+
+    const endpoint =
+      config.endpoints.campaigns.smartTargetingCapacityCalculations.replace(
+        ':uuid',
+        encodeURIComponent(uuid.trim())
+      );
+
+    return this.request<SmartTargetingCapacityCalculationResponse>(endpoint, {
+      method: 'POST',
+      body: JSON.stringify(
+        scoreClasses.length > 0 ? { score_classes: scoreClasses } : {}
+      ),
+      signal,
+    });
+  }
+
+  async getCurrentSmartTargetingCapacityCalculation(
+    uuid: string,
+    signal?: AbortSignal
+  ): Promise<ApiResponse<SmartTargetingCapacityCalculationResponse>> {
+    if (!uuid || typeof uuid !== 'string' || !uuid.trim()) {
+      return this.createErrorResponse('INVALID_CAMPAIGN_UUID');
+    }
+
+    const endpoint =
+      config.endpoints.campaigns.smartTargetingCapacityCalculations.replace(
+        ':uuid',
+        encodeURIComponent(uuid.trim())
+      );
+    return this.request<SmartTargetingCapacityCalculationResponse>(endpoint, {
+      method: 'GET',
+      signal,
+    });
+  }
+
+  async getSmartTargetingCapacityCalculationById(
+    uuid: string,
+    calculationId: number,
+    signal?: AbortSignal
+  ): Promise<ApiResponse<SmartTargetingCapacityCalculationResponse>> {
+    if (!uuid || typeof uuid !== 'string' || !uuid.trim()) {
+      return this.createErrorResponse('INVALID_CAMPAIGN_UUID');
+    }
+    if (!Number.isSafeInteger(calculationId) || calculationId < 1) {
+      return this.createErrorResponse('INVALID_CALCULATION_ID');
+    }
+
+    const endpoint =
+      config.endpoints.campaigns.smartTargetingCapacityCalculationById
+        .replace(':uuid', encodeURIComponent(uuid.trim()))
+        .replace(':calculation_id', encodeURIComponent(String(calculationId)));
+    return this.request<SmartTargetingCapacityCalculationResponse>(endpoint, {
+      method: 'GET',
       signal,
     });
   }

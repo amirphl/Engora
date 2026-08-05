@@ -22,6 +22,9 @@ export interface CampaignSegment {
   selectedTagIds?: number[]; // Campaign-level Smart Targeting tag IDs
   smartTargetingSelectedRawCapacity?: number;
   smartTargetingSelectionDirty?: boolean;
+  smartTargetingScoreClasses?: AudienceGrade[];
+  smartTargetingScoreClassesDirty?: boolean;
+  smartTargetingCapacityCalculation?: SmartTargetingCapacityCalculationResponse | null;
   capacityTooLow?: boolean;
   capacity?: number; // Total audience capacity (calculated from CSV)
   audienceGrades?: AudienceGrade[]; // Selected audience quality grades
@@ -323,6 +326,21 @@ export interface GetCampaignResponse {
   platform_base_price?: number | null;
   media_uuid?: string | null;
   audience_grades?: AudienceGrade[];
+  calculation_id?: number | null;
+  calculation_status?: string | null;
+  selected_score_classes?: AudienceGrade[];
+  raw_audience_count?: number | null;
+  eligible_unique_audience_count_before_approved_campaign_deduction?:
+    | number
+    | null;
+  approved_campaign_audience_deduction?: number | null;
+  usable_unique_audience_count?: number | null;
+  recalculation_required?: boolean;
+  started_at?: string | null;
+  finished_at?: string | null;
+  expires_at?: string | null;
+  error_code?: string | null;
+  error_message?: string | null;
   bundle_id?: number | null;
   bundle_title?: string | null;
   phase?: CampaignPhase | string | null;
@@ -385,6 +403,34 @@ export interface AutoSelectSmartTargetingTagsRequest {
 export interface SmartTargetingSelectionResponse {
   selected_tag_ids: number[];
   summary: SmartTargetingSelectionSummary;
+}
+
+export interface StartSmartTargetingCapacityCalculationRequest {
+  /** An empty or omitted array is the backend shorthand for all classes. */
+  score_classes?: AudienceGrade[];
+}
+
+export interface SmartTargetingCapacityCalculationResponse {
+  calculation_id: number;
+  campaign_id: number;
+  bundle_id: number;
+  status: string;
+  is_current: boolean;
+  recalculation_required: boolean;
+  selected_score_classes: AudienceGrade[];
+  selected_tag_count: number;
+  raw_audience_count?: number | null;
+  eligible_unique_audience_count_before_approved_campaign_deduction?:
+    | number
+    | null;
+  approved_campaign_audience_deduction?: number | null;
+  usable_unique_audience_count?: number | null;
+  created_at: string;
+  started_at?: string | null;
+  finished_at?: string | null;
+  expires_at?: string | null;
+  error_code?: string | null;
+  error_message?: string | null;
 }
 
 export interface ListSMSCampaignsResponse {

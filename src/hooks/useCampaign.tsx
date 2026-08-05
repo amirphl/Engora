@@ -26,6 +26,7 @@ import {
   normalizeLinkPlaceholder,
   validateCampaignContent,
 } from '../utils/campaignUtils';
+import { normalizeSmartTargetingCapacityCalculation } from '../utils/smartTargetingCapacity';
 
 interface CampaignContextType {
   currentStep: number;
@@ -157,6 +158,9 @@ const createDefaultCampaignData = (): CampaignData => ({
     selectedTagIds: [],
     smartTargetingSelectedRawCapacity: 0,
     smartTargetingSelectionDirty: false,
+    smartTargetingScoreClasses: [],
+    smartTargetingScoreClassesDirty: false,
+    smartTargetingCapacityCalculation: null,
     capacityTooLow: false,
     capacity: undefined,
     audienceGrades: [],
@@ -262,6 +266,17 @@ const normalizeStoredCampaignData = (value: unknown): CampaignData => {
         typeof storedSegment.smartTargetingSelectionDirty === 'boolean'
           ? storedSegment.smartTargetingSelectionDirty
           : normalizedSelectedTagIds.length > 0,
+      smartTargetingScoreClasses: normalizeAudienceGrades(
+        storedSegment.smartTargetingScoreClasses
+      ),
+      smartTargetingScoreClassesDirty:
+        typeof storedSegment.smartTargetingScoreClassesDirty === 'boolean'
+          ? storedSegment.smartTargetingScoreClassesDirty
+          : false,
+      smartTargetingCapacityCalculation:
+        normalizeSmartTargetingCapacityCalculation(
+          storedSegment.smartTargetingCapacityCalculation
+        ),
       capacityTooLow:
         typeof storedSegment.capacityTooLow === 'boolean'
           ? storedSegment.capacityTooLow
