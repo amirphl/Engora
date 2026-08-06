@@ -5,6 +5,7 @@ import { CampaignData } from '../../../types/campaign';
 import { useAuth } from '../../../hooks/useAuth';
 import { useLanguage } from '../../../hooks/useLanguage';
 import { budgetI18n } from './budgetTranslations';
+import { isCurrentUsableSmartTargetingCapacity } from '../../../utils/smartTargetingCapacity';
 
 export const useMessageCount = (campaignData: CampaignData) => {
   const [messageCount, setMessageCount] = useState<number | undefined>();
@@ -51,10 +52,30 @@ export const useMessageCount = (campaignData: CampaignData) => {
 
   const calculateMessageCount = useCallback(
     async (_currentLineNumber?: string, currentBudget?: number) => {
+      if (
+        campaignData.segment.audienceTargetingMethod === 'smart_targeting' &&
+        campaignData.segment.phase === 'test'
+      ) {
+        resetMessageCount();
+        return;
+      }
       const budget =
         currentBudget !== undefined
           ? currentBudget
           : campaignData.budget.totalBudget;
+      const isSmartTargetingExecution =
+        campaignData.segment.audienceTargetingMethod === 'smart_targeting' &&
+        campaignData.segment.phase === 'execution';
+      const exactUsableCapacity =
+        isSmartTargetingExecution &&
+        isCurrentUsableSmartTargetingCapacity(
+          campaignData.segment.smartTargetingCapacityCalculation,
+          campaignData.segment.selectedTagIds,
+          campaignData.segment.smartTargetingScoreClasses
+        )
+          ? campaignData.segment.smartTargetingCapacityCalculation
+              ?.usable_unique_audience_count
+          : undefined;
       setIsQueued(false);
 
       if (!accessToken || !Number.isSafeInteger(budget) || budget <= 0) {
@@ -122,8 +143,23 @@ export const useMessageCount = (campaignData: CampaignData) => {
           return;
         }
 
+        if (
+          isSmartTargetingExecution &&
+          typeof exactUsableCapacity === 'number' &&
+          targetMessages > exactUsableCapacity
+        ) {
+          clearDisplayedCalculation();
+          setError(t.requestedAudienceExceedsExactCapacity);
+          showToast('error', t.requestedAudienceExceedsExactCapacity);
+          return;
+        }
+
         setMessageCount(targetMessages);
-        setMaxMessageCount(maxTargetMessages);
+        setMaxMessageCount(
+          isSmartTargetingExecution && typeof exactUsableCapacity === 'number'
+            ? exactUsableCapacity
+            : maxTargetMessages
+        );
         setLastApiCall(Date.now());
         completedKeyRef.current = requestKey;
       } catch {
@@ -143,10 +179,16 @@ export const useMessageCount = (campaignData: CampaignData) => {
       accessToken,
       campaignData.budget.totalBudget,
       campaignData.id,
+      campaignData.segment.audienceTargetingMethod,
+      campaignData.segment.selectedTagIds,
+      campaignData.segment.smartTargetingCapacityCalculation,
+      campaignData.segment.smartTargetingScoreClasses,
+      campaignData.segment.phase,
       clearDisplayedCalculation,
       resetMessageCount,
       showToast,
       t.campaignIdRequiredForCostCalculation,
+      t.requestedAudienceExceedsExactCapacity,
     ]
   );
 
@@ -170,6 +212,13 @@ export const useMessageCount = (campaignData: CampaignData) => {
   useEffect(() => {
     if (initialCalculatedRef.current) return;
     if (!accessToken) return;
+    if (
+      campaignData.segment.audienceTargetingMethod === 'smart_targeting' &&
+      campaignData.segment.phase === 'test'
+    ) {
+      resetMessageCount();
+      return;
+    }
     const platform = campaignData.segment.platform || 'sms';
     const hasIdentifier =
       platform === 'sms'
@@ -189,6 +238,9 @@ export const useMessageCount = (campaignData: CampaignData) => {
     campaignData.content.lineNumber,
     campaignData.content.platformSettingsId,
     campaignData.segment.platform,
+    campaignData.segment.audienceTargetingMethod,
+    campaignData.segment.phase,
+    resetMessageCount,
   ]);
 
   useEffect(
