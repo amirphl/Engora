@@ -36,6 +36,24 @@ const budgetEn = {
   estimatedMessagesHelp:
     'This field is automatically calculated by the backend based on your budget and current message costs.',
   note: 'Note:',
+  smartTargetingTest: {
+    title: 'Smart Targeting Test Audience and Cost',
+    helper:
+      'In Smart Targeting Test phase, audience count is determined by the sample size per tag and the tags that can satisfy that sample. Change the selected tags or Sample Size per Tag to change the audience count.',
+    selectedTags: 'Selected Tags',
+    sampleSizePerTag: 'Sample Size per Tag',
+    requestedAudience: 'Requested Test Audience',
+    satisfiedTags: 'Satisfied Tags',
+    unsatisfiedTags: 'Unsatisfied Tags',
+    effectiveAudience: 'Effective Test Audience',
+    campaignCost: 'Estimated Campaign Cost',
+    previewRequired:
+      'No current preview is available. Return to the audience step and check Test sample availability.',
+    previewStale:
+      'The previous preview is stale. Return to the audience step and check availability again.',
+    estimateLimitation:
+      'This preview reflects current audience availability. Final Test audience selection is performed at scheduler runtime and may differ if availability changes.',
+  },
 
   // Budget summary
   budgetSummary: 'Budget Summary',
@@ -43,6 +61,8 @@ const budgetEn = {
   estimatedMessagesLabel: 'Estimated Messages:',
   calculateMessageCount: 'Calculate Message Count',
   calculatingMessageCount: 'Calculating message count...',
+  requestedAudienceExceedsExactCapacity:
+    'The requested audience count exceeds the exact usable capacity.',
   campaignIdRequiredForCostCalculation:
     'Campaign ID is missing. Please create the campaign again before calculating message count.',
   messageCountResult: '{count} messages can be sent',
@@ -136,6 +156,24 @@ const budgetFa = {
   estimatedMessagesHelp:
     'این فیلد به طور خودکار توسط سیستم بر اساس بودجه شما و هزینه‌های فعلی پیام محاسبه می‌شود.',
   note: 'توجه:',
+  smartTargetingTest: {
+    title: 'مخاطبان و هزینه تست هدف‌گیری هوشمند',
+    helper:
+      'در فاز تست هدف‌گیری هوشمند، تعداد مخاطبان با اندازه نمونه هر برچسب و برچسب‌هایی که نمونه را تأمین می‌کنند تعیین می‌شود. برای تغییر تعداد مخاطبان، برچسب‌ها یا اندازه نمونه را تغییر دهید.',
+    selectedTags: 'برچسب‌های انتخاب‌شده',
+    sampleSizePerTag: 'اندازه نمونه برای هر برچسب',
+    requestedAudience: 'مخاطبان درخواستی تست',
+    satisfiedTags: 'برچسب‌های تأمین‌شده',
+    unsatisfiedTags: 'برچسب‌های تأمین‌نشده',
+    effectiveAudience: 'مخاطبان مؤثر تست',
+    campaignCost: 'هزینه تخمینی ارسال',
+    previewRequired:
+      'پیش‌نمایش فعلی موجود نیست. به مرحله مخاطبان بازگردید و موجودی نمونه تست را بررسی کنید.',
+    previewStale:
+      'پیش‌نمایش قبلی قدیمی شده است. به مرحله مخاطبان بازگردید و موجودی را دوباره بررسی کنید.',
+    estimateLimitation:
+      'این پیش‌نمایش موجودی فعلی مخاطبان را نشان می‌دهد. انتخاب نهایی مخاطبان تست هنگام اجرای زمان‌بند انجام می‌شود و در صورت تغییر موجودی ممکن است متفاوت باشد.',
+  },
 
   // Budget summary
   budgetSummary: 'خلاصه بودجه',
@@ -143,6 +181,8 @@ const budgetFa = {
   estimatedMessagesLabel: 'تعداد پیام‌های تخمینی:',
   calculateMessageCount: 'محاسبه تعداد پیام',
   calculatingMessageCount: 'در حال محاسبه تعداد پیام...',
+  requestedAudienceExceedsExactCapacity:
+    'تعداد مخاطبان انتخاب‌شده بیشتر از ظرفیت دقیق قابل استفاده است.',
   campaignIdRequiredForCostCalculation:
     'شناسه کمپین موجود نیست. لطفاً پیش از محاسبه تعداد پیام، دوباره کمپین را ایجاد کنید.',
   messageCountResult: '{count} پیام می‌توان با بودجه شما ارسال کرد',
