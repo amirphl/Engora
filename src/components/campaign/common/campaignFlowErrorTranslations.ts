@@ -12,6 +12,10 @@ const campaignFlowErrorsEn: CampaignFlowErrorCopy = {
     INVALID_CAMPAIGN_UUID: 'Campaign UUID is invalid.',
     MISSING_CUSTOMER_ID: 'Authentication is missing. Please log in again.',
     INVALID_STATE: 'Another request is already in progress.',
+    SMART_TARGETING_CAPACITY_PENDING:
+      'Exact Smart Targeting capacity is being calculated. Please wait and try again.',
+    SMART_TARGETING_EXACT_CAPACITY_REQUIRED:
+      'Recalculate the current exact Smart Targeting capacity before proceeding.',
     CAMPAIGN_NOT_FOUND: 'Campaign not found.',
     CAMPAIGN_ACCESS_DENIED: 'You do not have access to this campaign.',
     CAMPAIGN_UPDATE_NOT_ALLOWED:
@@ -81,6 +85,10 @@ const campaignFlowErrorsFa: CampaignFlowErrorCopy = {
     INVALID_CAMPAIGN_UUID: 'شناسه کمپین نامعتبر است.',
     MISSING_CUSTOMER_ID: 'مشخصات احراز هویت یافت نشد. لطفاً دوباره وارد شوید.',
     INVALID_STATE: 'درخواست دیگری در حال پردازش است.',
+    SMART_TARGETING_CAPACITY_PENDING:
+      'ظرفیت دقیق هدف‌گیری هوشمند در حال محاسبه است. لطفاً منتظر بمانید و دوباره تلاش کنید.',
+    SMART_TARGETING_EXACT_CAPACITY_REQUIRED:
+      'پیش از ادامه، ظرفیت دقیق فعلی هدف‌گیری هوشمند را دوباره محاسبه کنید.',
     CAMPAIGN_NOT_FOUND: 'کمپین یافت نشد.',
     CAMPAIGN_ACCESS_DENIED: 'شما به این کمپین دسترسی ندارید.',
     CAMPAIGN_UPDATE_NOT_ALLOWED:
