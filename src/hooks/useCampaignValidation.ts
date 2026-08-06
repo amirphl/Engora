@@ -6,6 +6,11 @@ import {
   MAX_CAMPAIGN_STRING_LENGTH,
   validateCampaignContent,
 } from '../utils/campaignUtils';
+import { isCurrentUsableSmartTargetingCapacity } from '../utils/smartTargetingCapacity';
+import {
+  hasUsableSmartTargetingTestPreview,
+  isCurrentSmartTargetingTestPreview,
+} from '../utils/smartTargetingTestPreview';
 
 export const useCampaignValidation = (
   campaignData: CampaignData,
@@ -25,6 +30,8 @@ export const useCampaignValidation = (
       (segment.targetAudienceExcelFileUuid != null ? 'excel' : 'standard');
     const isTargetAudienceExcelFileMode = audienceTargetingMethod === 'excel';
     const isSmartTargetingMode = audienceTargetingMethod === 'smart_targeting';
+    const isSmartTargetingTest =
+      isSmartTargetingMode && segment.phase === 'test';
     const excelFileUploaded = isUuidV4(segment.targetAudienceExcelFileUuid);
     const hasSmartTargetingSelection =
       (segment.selectedTagIds?.length ?? 0) > 0 &&
@@ -34,7 +41,23 @@ export const useCampaignValidation = (
       ) &&
       new Set(segment.selectedTagIds ?? []).size ===
         (segment.selectedTagIds?.length ?? 0) &&
-      (segment.smartTargetingSelectedRawCapacity ?? 0) >= 500;
+      (isSmartTargetingTest ||
+        (segment.smartTargetingSelectedRawCapacity ?? 0) >= 500);
+    const sampleSizePerTagValid =
+      Number.isSafeInteger(segment.sampleSizePerTag) &&
+      (segment.sampleSizePerTag ?? 0) > 0 &&
+      Number.isSafeInteger(
+        (segment.sampleSizePerTag ?? 0) * (segment.selectedTagIds?.length ?? 0)
+      );
+    const exactCapacityRequirementSatisfied =
+      isSmartTargetingTest ||
+      segment.smartTargetingExactCapacityRequired !== true ||
+      (segment.smartTargetingSelectionDirty !== true &&
+        isCurrentUsableSmartTargetingCapacity(
+          segment.smartTargetingCapacityCalculation,
+          segment.selectedTagIds,
+          segment.smartTargetingScoreClasses
+        ));
     const audienceGradesValid =
       (segment.audienceGrades?.length ?? 0) <= 3 &&
       (segment.audienceGrades ?? []).every(
@@ -61,6 +84,10 @@ export const useCampaignValidation = (
       segment.platform &&
       (!isTargetAudienceExcelFileMode || excelFileUploaded) &&
       (!isSmartTargetingMode || hasSmartTargetingSelection) &&
+      (!isSmartTargetingTest || sampleSizePerTagValid) &&
+      (!isSmartTargetingTest ||
+        segment.smartTargetingSelectionOrderPending !== true) &&
+      (!isSmartTargetingMode || exactCapacityRequirementSatisfied) &&
       (isTargetAudienceExcelFileMode ||
         isSmartTargetingMode ||
         hasValidLevelSelection) &&
@@ -99,13 +126,38 @@ export const useCampaignValidation = (
 
   const step3Valid = useMemo(() => {
     const { budget, content, segment: level } = campaignData;
+    const isSmartTargetingTest =
+      level.audienceTargetingMethod === 'smart_targeting' &&
+      level.phase === 'test';
+    const isSmartTargetingExecution =
+      level.audienceTargetingMethod === 'smart_targeting' &&
+      level.phase === 'execution';
+    const exactUsableCapacity =
+      isSmartTargetingExecution &&
+      isCurrentUsableSmartTargetingCapacity(
+        level.smartTargetingCapacityCalculation,
+        level.selectedTagIds,
+        level.smartTargetingScoreClasses
+      )
+        ? level.smartTargetingCapacityCalculation?.usable_unique_audience_count
+        : undefined;
+    const previewCost = level.smartTargetingTestPreview?.campaign_cost;
     return (
       (level.platform === 'sms'
         ? !!content.lineNumber
         : !!content.platformSettingsId) &&
-      Number.isInteger(budget.totalBudget) &&
-      budget.totalBudget >= MIN_BUDGET &&
-      budget.totalBudget <= MAX_BUDGET
+      (isSmartTargetingTest
+        ? hasUsableSmartTargetingTestPreview(campaignData) &&
+          Number.isSafeInteger(budget.totalBudget) &&
+          budget.totalBudget >= 0 &&
+          budget.totalBudget === previewCost
+        : Number.isInteger(budget.totalBudget) &&
+          budget.totalBudget >= MIN_BUDGET &&
+          budget.totalBudget <= MAX_BUDGET &&
+          (!isSmartTargetingExecution ||
+            typeof exactUsableCapacity !== 'number' ||
+            (Number.isSafeInteger(budget.estimatedMessages) &&
+              (budget.estimatedMessages ?? 0) <= exactUsableCapacity)))
     );
   }, [campaignData]);
 
@@ -178,6 +230,8 @@ export const useCampaignValidation = (
               : 'standard');
           const isSmartTargetingMode =
             audienceTargetingMethod === 'smart_targeting';
+          const isSmartTargetingTest =
+            isSmartTargetingMode && campaignData.segment.phase === 'test';
           const isTargetAudienceExcelFileMode =
             audienceTargetingMethod === 'excel';
 
@@ -248,9 +302,39 @@ export const useCampaignValidation = (
             errors.push('Smart Targeting selection contains invalid tag IDs');
           } else if (
             isSmartTargetingMode &&
+            !isSmartTargetingTest &&
             (campaignData.segment.smartTargetingSelectedRawCapacity ?? 0) < 500
           ) {
             errors.push('Audience capacity is too low');
+          }
+          if (
+            isSmartTargetingMode &&
+            !isSmartTargetingTest &&
+            campaignData.segment.smartTargetingExactCapacityRequired === true &&
+            !isCurrentUsableSmartTargetingCapacity(
+              campaignData.segment.smartTargetingCapacityCalculation,
+              campaignData.segment.selectedTagIds,
+              campaignData.segment.smartTargetingScoreClasses
+            )
+          ) {
+            errors.push(
+              'Calculate the current exact Smart Targeting capacity before continuing'
+            );
+          }
+          if (
+            isSmartTargetingTest &&
+            (!Number.isSafeInteger(campaignData.segment.sampleSizePerTag) ||
+              (campaignData.segment.sampleSizePerTag ?? 0) <= 0)
+          ) {
+            errors.push('Sample Size per Tag must be a positive whole number');
+          }
+          if (
+            isSmartTargetingTest &&
+            campaignData.segment.smartTargetingSelectionOrderPending === true
+          ) {
+            errors.push(
+              'Wait for the selected tags to be synchronized with the current table order'
+            );
           }
           if (isAgency && !campaignData.segment.jobCategory) {
             errors.push('Please select a category');
@@ -293,6 +377,12 @@ export const useCampaignValidation = (
         break;
       case 3:
         if (!step3Valid) {
+          const isSmartTargetingTest =
+            campaignData.segment.audienceTargetingMethod ===
+              'smart_targeting' && campaignData.segment.phase === 'test';
+          const isSmartTargetingExecution =
+            campaignData.segment.audienceTargetingMethod ===
+              'smart_targeting' && campaignData.segment.phase === 'execution';
           if (campaignData.segment.platform === 'sms') {
             if (!campaignData.content.lineNumber) {
               errors.push('Please select a line number');
@@ -302,12 +392,53 @@ export const useCampaignValidation = (
               errors.push('Please select an active service');
             }
           }
-          if (!Number.isInteger(campaignData.budget.totalBudget)) {
+          if (
+            isSmartTargetingTest &&
+            !hasUsableSmartTargetingTestPreview(campaignData)
+          ) {
+            errors.push(
+              isCurrentSmartTargetingTestPreview(campaignData)
+                ? 'No selected tag can currently provide the full requested Test sample'
+                : 'Run a current Test sample availability preview before continuing'
+            );
+          } else if (!Number.isInteger(campaignData.budget.totalBudget)) {
             errors.push('Total budget must be a whole number');
-          } else if (campaignData.budget.totalBudget < MIN_BUDGET) {
+          } else if (
+            !isSmartTargetingTest &&
+            campaignData.budget.totalBudget < MIN_BUDGET
+          ) {
             errors.push('Please set a total budget of at least 100,000');
-          } else if (campaignData.budget.totalBudget > MAX_BUDGET) {
+          } else if (
+            !isSmartTargetingTest &&
+            campaignData.budget.totalBudget > MAX_BUDGET
+          ) {
             errors.push('Total budget exceeds the maximum allowed');
+          } else if (
+            isSmartTargetingExecution &&
+            isCurrentUsableSmartTargetingCapacity(
+              campaignData.segment.smartTargetingCapacityCalculation,
+              campaignData.segment.selectedTagIds,
+              campaignData.segment.smartTargetingScoreClasses
+            ) &&
+            !Number.isSafeInteger(campaignData.budget.estimatedMessages)
+          ) {
+            errors.push(
+              'Wait for the requested audience count to be calculated'
+            );
+          } else if (
+            isSmartTargetingExecution &&
+            isCurrentUsableSmartTargetingCapacity(
+              campaignData.segment.smartTargetingCapacityCalculation,
+              campaignData.segment.selectedTagIds,
+              campaignData.segment.smartTargetingScoreClasses
+            ) &&
+            (campaignData.budget.estimatedMessages ?? 0) >
+              (campaignData.segment.smartTargetingCapacityCalculation
+                ?.usable_unique_audience_count ?? 0)
+          ) {
+            errors.push(
+              'The requested audience count exceeds the exact usable capacity'
+            );
           }
         }
         break;
