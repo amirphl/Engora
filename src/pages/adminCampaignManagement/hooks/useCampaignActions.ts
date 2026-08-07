@@ -4,9 +4,11 @@ import { adminCampaignManagementApi } from '../api';
 import { CampaignActionType } from '../constants';
 import { AdminCampaignManagementCopy } from '../translations';
 import { requiresComment } from '../utils';
+import { getErrorMessage } from '../../../utils/errorHandler';
 
 interface UseCampaignActionsOptions {
   copy: AdminCampaignManagementCopy;
+  language: 'en' | 'fa';
   showError: (message: string) => void;
   onActionSuccess: (
     campaign: AdminGetCampaignResponse,
@@ -17,6 +19,7 @@ interface UseCampaignActionsOptions {
 
 export const useCampaignActions = ({
   copy,
+  language,
   showError,
   onActionSuccess,
 }: UseCampaignActionsOptions) => {
@@ -94,7 +97,11 @@ export const useCampaignActions = ({
               ? copy.errors.rejectFailed
               : copy.errors.cancelFailed;
 
-        const message = response.message || fallback;
+        const message = getErrorMessage(
+          response.error?.code,
+          language,
+          fallback
+        );
         setActionError(message);
         showError(message);
         return;
@@ -125,6 +132,7 @@ export const useCampaignActions = ({
     actionType,
     closeActionModal,
     copy.errors,
+    language,
     onActionSuccess,
     showError,
   ]);
