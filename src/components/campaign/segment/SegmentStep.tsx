@@ -17,6 +17,8 @@ import {
   getLevel3Options,
   getItemTags,
   getLevel2Metadata,
+  getAudienceSpecItem,
+  calculateAudienceGradeCapacity,
 } from './utils';
 import {
   LevelSelectionState,
@@ -31,8 +33,8 @@ import {
   CampaignData,
   CampaignPhase,
   CampaignPlatform,
+  SmartTargetingCapacityCalculationResponse,
 } from '../../../types/campaign';
-import { getLayer3Stat, calcGradeCapacity } from '../../../data/layer3Stats';
 import { campaignLevelI18n } from './segmentTranslations';
 import { useLanguage } from '../../../hooks/useLanguage';
 import CategoryJobFields from '../../CategoryJobFields';
@@ -44,10 +46,19 @@ import TargetAudienceExcelFileUploadCard, {
 } from './TargetAudienceExcelFileUploadCard';
 import BundleInfoCard from '../content/BundleInfoCard';
 import SmartTargetingTagsTable from './SmartTargetingTagsTable';
+import SmartTargetingExactCapacity from './SmartTargetingExactCapacity';
+import SmartTargetingTestSamplingPreview from './SmartTargetingTestSamplingPreview';
 import {
   normalizeCampaignResponseToDraft,
   type SmartTargetingDraftSelection,
 } from '../../../utils/campaignCreationDraft';
+import { serializeCampaignPayload } from '../../../utils/campaignUtils';
+import { useCampaignValidation } from '../../../hooks/useCampaignValidation';
+import { isCurrentUsableSmartTargetingCapacity } from '../../../utils/smartTargetingCapacity';
+import {
+  getSmartTargetingTestPreviewInputKey,
+  isCurrentSmartTargetingTestPreview,
+} from '../../../utils/smartTargetingTestPreview';
 
 const isAudienceTargetingMethod = (
   value: unknown
@@ -78,8 +89,11 @@ const LevelStep: React.FC = () => {
     campaignData,
     updateLevel,
     updateContent,
+    updateBudget,
     replaceCampaignData,
     resetCampaign,
+    ensureCampaignCreated,
+    isCampaignCreationPending,
   } = useCampaign();
   const { accessToken, user } = useAuth();
   const { showError } = useToast();
@@ -87,6 +101,7 @@ const LevelStep: React.FC = () => {
   const showErrorRef = useRef(showError);
   const categories = getJobCategories(language);
   const isAgency = user?.account_type === 'marketing_agency';
+  const campaignValidation = useCampaignValidation(campaignData, 1, isAgency);
 
   // Local state for selections
   const [campaignTitle, setCampaignTitle] = useState<string>(
@@ -130,16 +145,10 @@ const LevelStep: React.FC = () => {
   );
   const isTargetAudienceExcelFileMode = audienceTargetingMethod === 'excel';
   const isSmartTargetingMode = audienceTargetingMethod === 'smart_targeting';
+  const isSmartTargetingTest =
+    isSmartTargetingMode && campaignData.segment.phase === 'test';
   const [persistedCampaignContext, setPersistedCampaignContext] =
-    useState<PersistedCampaignContext | null>(() =>
-      campaignData.uuid
-        ? {
-            uuid: campaignData.uuid,
-            bundleId: campaignData.segment.bundleId ?? null,
-            audienceTargetingMethod,
-          }
-        : null
-    );
+    useState<PersistedCampaignContext | null>(null);
   const canUseCampaignSmartTargetingApis =
     persistedCampaignContext?.uuid === campaignData.uuid &&
     persistedCampaignContext.bundleId ===
@@ -168,18 +177,13 @@ const LevelStep: React.FC = () => {
     setPersistedCampaignContext(current => {
       if (!campaignData.uuid) return null;
       if (current?.uuid === campaignData.uuid) return current;
-
-      return {
-        uuid: campaignData.uuid,
-        bundleId: campaignData.segment.bundleId ?? null,
-        audienceTargetingMethod,
-      };
+      // Local storage can contain segment edits that were never persisted.
+      // A UUID alone is therefore not proof that the local bundle/mode matches
+      // the server. Keep the context unknown until a fetch/create/update
+      // establishes it explicitly.
+      return null;
     });
-  }, [
-    audienceTargetingMethod,
-    campaignData.segment.bundleId,
-    campaignData.uuid,
-  ]);
+  }, [campaignData.uuid]);
 
   const hasLocalDraftCampaign = useCallback(() => {
     const current = campaignDataRef.current;
@@ -400,6 +404,8 @@ const LevelStep: React.FC = () => {
           selectedTagIds: normalized.segment.selectedTagIds ?? [],
           smartTargetingSelectedRawCapacity:
             normalized.segment.smartTargetingSelectedRawCapacity ?? 0,
+          smartTargetingScoreClasses:
+            normalized.segment.smartTargetingScoreClasses ?? [],
           metadata: {},
           tags: normalized.segment.tags || [],
           count: normalized.segment.capacity || 0,
@@ -410,6 +416,17 @@ const LevelStep: React.FC = () => {
       }
 
       replaceCampaignData(normalized, 1);
+      setPersistedCampaignContext(
+        normalized.uuid
+          ? {
+              uuid: normalized.uuid,
+              bundleId: normalized.segment.bundleId ?? null,
+              audienceTargetingMethod: resolveAudienceTargetingMethod(
+                normalized.segment
+              ),
+            }
+          : null
+      );
 
       setCampaignTitle(normalized.segment.campaignTitle || '');
       setPlatform(normalized.segment.platform || 'sms');
@@ -661,7 +678,7 @@ const LevelStep: React.FC = () => {
       return; // Exit early to prevent duplicate updates
     }
 
-    // Collect tags and metadata from audienceSpec; calculate capacity from CSV
+    // Collect tags, metadata, and capacities from the audience spec API.
     const nextGradeCapacities: Record<AudienceGrade, number> = {
       A: 0,
       B: 0,
@@ -683,7 +700,7 @@ const LevelStep: React.FC = () => {
 
       selectedForL3.forEach(l3 => {
         // Tags and metadata from audienceSpec
-        const item = (audienceSpec as any)?.[level1]?.[l2]?.items?.[l3];
+        const item = getAudienceSpecItem(audienceSpec, level1, l2, l3);
         const itemTags = getItemTags(audienceSpec, level1, l2, l3);
         itemTags.forEach(tag => tags.add(tag));
         if (item) {
@@ -693,12 +710,11 @@ const LevelStep: React.FC = () => {
           };
         }
 
-        // Capacity and grade capacities from CSV
-        const stat = getLayer3Stat(l3);
-        if (stat) {
+        // Grade capacities come from the statistics on the selected API item.
+        if (item) {
           (['A', 'B', 'C'] as AudienceGrade[]).forEach(grade => {
-            nextGradeCapacities[grade] += calcGradeCapacity(
-              stat,
+            nextGradeCapacities[grade] += calculateAudienceGradeCapacity(
+              item,
               grade,
               platform
             );
@@ -725,6 +741,8 @@ const LevelStep: React.FC = () => {
       selectedTagIds: campaignData.segment.selectedTagIds ?? [],
       smartTargetingSelectedRawCapacity:
         campaignData.segment.smartTargetingSelectedRawCapacity ?? 0,
+      smartTargetingScoreClasses:
+        campaignData.segment.smartTargetingScoreClasses ?? [],
       metadata: metadata,
       tags: Array.from(tags),
       count: selectedGradeCapacity,
@@ -734,7 +752,7 @@ const LevelStep: React.FC = () => {
     // Save to dedicated level selection storage
     saveLevelSelection(selectionState);
 
-    // Block when level3s are selected but CSV has no match (capacity = 0) or capacity < 500
+    // Block when selected API items have no capacity or capacity is below 500.
     const capacityTooLow =
       !isTargetAudienceExcelFileMode &&
       l3Array.length > 0 &&
@@ -761,6 +779,7 @@ const LevelStep: React.FC = () => {
     audienceTargetingMethod,
     campaignData.segment.selectedTagIds,
     campaignData.segment.smartTargetingSelectedRawCapacity,
+    campaignData.segment.smartTargetingScoreClasses,
     campaignData.segment.targetAudienceExcelFileUuid,
     campaignTitle,
     jobCategory,
@@ -786,6 +805,16 @@ const LevelStep: React.FC = () => {
             selectedTagIds: [],
             smartTargetingSelectedRawCapacity: 0,
             smartTargetingSelectionDirty: false,
+            smartTargetingScoreClasses: [],
+            smartTargetingScoreClassesDirty: false,
+            smartTargetingCapacityCalculation: null,
+            smartTargetingExactCapacityRequired: false,
+            smartTargetingSortBy: '',
+            smartTargetingSortDirection: 'desc',
+            smartTargetingSelectionOrderPending: false,
+            smartTargetingTestPreview: null,
+            smartTargetingTestPreviewInputKey: null,
+            smartTargetingTestPreviewStale: false,
           }
         : {}),
     });
@@ -793,7 +822,12 @@ const LevelStep: React.FC = () => {
 
   const handlePhaseChange = (value: string) => {
     if (value === 'test' || value === 'execution') {
-      updateLevel({ phase: value as CampaignPhase });
+      updateLevel({
+        phase: value as CampaignPhase,
+        smartTargetingSelectionOrderPending:
+          value === 'test' &&
+          (campaignDataRef.current.segment.selectedTagIds?.length ?? 0) > 1,
+      });
     }
   };
 
@@ -814,6 +848,8 @@ const LevelStep: React.FC = () => {
       audienceTargetingMethod: method,
       selectedTagIds,
       smartTargetingSelectedRawCapacity: selectedRawCapacity,
+      smartTargetingScoreClasses:
+        campaignData.segment.smartTargetingScoreClasses ?? [],
       count:
         method === 'smart_targeting'
           ? selectedRawCapacity
@@ -843,11 +879,276 @@ const LevelStep: React.FC = () => {
       selectedTagIds: tagIds,
       smartTargetingSelectedRawCapacity: selectedRawCapacity,
       smartTargetingSelectionDirty: source === 'local',
+      smartTargetingSelectionOrderPending:
+        campaignDataRef.current.segment.phase === 'test' && tagIds.length > 1,
       capacity: undefined,
-      capacityTooLow: tagIds.length > 0 && selectedRawCapacity < 500,
+      capacityTooLow:
+        campaignDataRef.current.segment.phase !== 'test' &&
+        tagIds.length > 0 &&
+        selectedRawCapacity < 500,
     });
     persistTargetingSelection('smart_targeting', tagIds, selectedRawCapacity);
   };
+
+  const handleCapacitySelectionPersisted = useCallback(
+    (tagIds: number[], selectedRawCapacity: number) => {
+      updateLevel({
+        audienceTargetingMethod: 'smart_targeting',
+        selectedTagIds: tagIds,
+        smartTargetingSelectedRawCapacity: selectedRawCapacity,
+        smartTargetingSelectionDirty: false,
+      });
+    },
+    [updateLevel]
+  );
+
+  const handleSmartTargetingSortChange = useCallback(
+    (
+      sortBy: CampaignData['segment']['smartTargetingSortBy'],
+      sortDirection: CampaignData['segment']['smartTargetingSortDirection']
+    ) => {
+      const current = campaignDataRef.current.segment;
+      if (
+        current.smartTargetingSortBy === sortBy &&
+        current.smartTargetingSortDirection === sortDirection
+      ) {
+        return;
+      }
+      updateLevel({
+        smartTargetingSortBy: sortBy,
+        smartTargetingSortDirection: sortDirection,
+        smartTargetingSelectionOrderPending:
+          current.phase === 'test' && (current.selectedTagIds?.length ?? 0) > 1,
+      });
+    },
+    [updateLevel]
+  );
+
+  const handleSmartTargetingSelectionOrderSyncChange = useCallback(
+    (pending: boolean) => {
+      const current = campaignDataRef.current.segment;
+      if (current.smartTargetingSelectionOrderPending === pending) return;
+      updateLevel({ smartTargetingSelectionOrderPending: pending });
+    },
+    [updateLevel]
+  );
+
+  const handleEnsureCampaignCreatedForCapacity = useCallback(
+    async (signal?: AbortSignal) => {
+      const current = campaignDataRef.current;
+      if (current.uuid.trim()) {
+        if (!canUseCampaignSmartTargetingApis) {
+          apiService.setAccessToken(accessToken || null);
+          const updatePayload = serializeCampaignPayload(current, {
+            includeContent: false,
+            includeBudget: false,
+            finalize: false,
+          });
+          const response = await apiService.updateCampaign(
+            current.uuid,
+            updatePayload,
+            signal
+          );
+          if (!response.success) {
+            return {
+              success: false,
+              errorCode: response.error?.code || 'CAMPAIGN_UPDATE_FAILED',
+            };
+          }
+          setPersistedCampaignContext({
+            uuid: current.uuid.trim(),
+            bundleId: current.segment.bundleId ?? null,
+            audienceTargetingMethod: 'smart_targeting',
+          });
+        }
+        return {
+          success: true,
+          uuid: current.uuid.trim(),
+          created: false,
+          selectionPersisted: !canUseCampaignSmartTargetingApis,
+        };
+      }
+      if (!campaignValidation.isStepCompleted(1)) {
+        return { success: false, errorCode: 'INVALID_CAMPAIGN_DATA' };
+      }
+
+      apiService.setAccessToken(accessToken || null);
+      const payload = serializeCampaignPayload(current);
+      const response = await ensureCampaignCreated(() =>
+        apiService.createCampaign(payload)
+      );
+      const uuid = response.data?.uuid?.trim();
+      const id = response.data?.id;
+      if (
+        !response.success ||
+        !uuid ||
+        !Number.isInteger(id) ||
+        (id ?? 0) < 1
+      ) {
+        return {
+          success: false,
+          errorCode:
+            response.error?.code ||
+            (response.success
+              ? 'INVALID_RESPONSE'
+              : 'CAMPAIGN_CREATION_FAILED'),
+        };
+      }
+
+      setPersistedCampaignContext({
+        uuid,
+        bundleId: current.segment.bundleId ?? null,
+        audienceTargetingMethod: 'smart_targeting',
+      });
+
+      return {
+        success: true,
+        uuid,
+        created: true,
+        selectionPersisted: true,
+      };
+    },
+    [
+      accessToken,
+      campaignValidation,
+      canUseCampaignSmartTargetingApis,
+      ensureCampaignCreated,
+    ]
+  );
+
+  const handleSmartTargetingScoreClassesChange = useCallback(
+    (scoreClasses: AudienceGrade[], source: 'local' | 'server') => {
+      const current = campaignDataRef.current.segment;
+      const nextDirty = source === 'local';
+      if (
+        current.smartTargetingScoreClassesDirty === nextDirty &&
+        JSON.stringify(current.smartTargetingScoreClasses || []) ===
+          JSON.stringify(scoreClasses)
+      ) {
+        return;
+      }
+      updateLevel({
+        smartTargetingScoreClasses: scoreClasses,
+        smartTargetingScoreClassesDirty: nextDirty,
+      });
+    },
+    [updateLevel]
+  );
+
+  const handleSmartTargetingCalculationChange = useCallback(
+    (calculation: SmartTargetingCapacityCalculationResponse | null) => {
+      const current = campaignDataRef.current.segment;
+      const calculationIsCurrent = isCurrentUsableSmartTargetingCapacity(
+        calculation,
+        current.selectedTagIds,
+        calculation?.selected_score_classes
+      );
+      if (
+        JSON.stringify(current.smartTargetingCapacityCalculation ?? null) ===
+          JSON.stringify(calculation) &&
+        (!calculationIsCurrent ||
+          current.smartTargetingExactCapacityRequired !== true)
+      ) {
+        return;
+      }
+      updateLevel({
+        smartTargetingCapacityCalculation: calculation,
+        ...(calculationIsCurrent
+          ? { smartTargetingExactCapacityRequired: false }
+          : {}),
+      });
+    },
+    [updateLevel]
+  );
+
+  const handlePrepareCampaignForTestPreview = useCallback(
+    async (signal?: AbortSignal) => {
+      const current = campaignDataRef.current;
+      if (!campaignValidation.isStepCompleted(1)) {
+        return { success: false, errorCode: 'INVALID_CAMPAIGN_DATA' };
+      }
+
+      apiService.setAccessToken(accessToken || null);
+      if (current.uuid.trim()) {
+        const response = await apiService.updateCampaign(
+          current.uuid,
+          serializeCampaignPayload(current, {
+            includeContent: false,
+            includeBudget: false,
+            finalize: false,
+          }),
+          signal
+        );
+        if (!response.success) {
+          return {
+            success: false,
+            errorCode: response.error?.code || 'CAMPAIGN_UPDATE_FAILED',
+          };
+        }
+        setPersistedCampaignContext({
+          uuid: current.uuid.trim(),
+          bundleId: current.segment.bundleId ?? null,
+          audienceTargetingMethod: 'smart_targeting',
+        });
+        return { success: true, uuid: current.uuid.trim() };
+      }
+
+      const response = await ensureCampaignCreated(() =>
+        apiService.createCampaign(serializeCampaignPayload(current))
+      );
+      const uuid = response.data?.uuid?.trim();
+      if (!response.success || !uuid) {
+        return {
+          success: false,
+          errorCode: response.error?.code || 'CAMPAIGN_CREATION_FAILED',
+        };
+      }
+      setPersistedCampaignContext({
+        uuid,
+        bundleId: current.segment.bundleId ?? null,
+        audienceTargetingMethod: 'smart_targeting',
+      });
+      return { success: true, uuid };
+    },
+    [accessToken, campaignValidation, ensureCampaignCreated]
+  );
+
+  const handleTestConfigurationPersisted = useCallback(
+    (tagIds: number[], selectedRawCapacity: number) => {
+      updateLevel({
+        selectedTagIds: tagIds,
+        smartTargetingSelectedRawCapacity: selectedRawCapacity,
+        smartTargetingSelectionDirty: false,
+        smartTargetingScoreClassesDirty: false,
+      });
+    },
+    [updateLevel]
+  );
+
+  const handleTestPreviewChange = useCallback(
+    (
+      preview: NonNullable<
+        CampaignData['segment']['smartTargetingTestPreview']
+      >,
+      campaignUuid: string
+    ) => {
+      const current = campaignDataRef.current;
+      if (current.uuid.trim() !== campaignUuid.trim()) return;
+      updateLevel({
+        smartTargetingTestPreview: preview,
+        smartTargetingTestPreviewInputKey: getSmartTargetingTestPreviewInputKey(
+          campaignUuid,
+          current.segment
+        ),
+        smartTargetingTestPreviewStale: false,
+      });
+      updateBudget({
+        totalBudget: preview.campaign_cost,
+        estimatedMessages: preview.effective_audience_count,
+      });
+    },
+    [updateBudget, updateLevel]
+  );
 
   const handleSegmentationModeChange = (
     mode: 'target-audience-excel-file' | 'levels' | 'smart-targeting'
@@ -859,6 +1160,7 @@ const LevelStep: React.FC = () => {
       setTargetAudienceExcelFileName(null);
       updateLevel({
         audienceTargetingMethod: 'standard',
+        smartTargetingSelectionOrderPending: false,
       });
       persistTargetingSelection('standard');
       return;
@@ -921,6 +1223,7 @@ const LevelStep: React.FC = () => {
 
     updateLevel({
       audienceTargetingMethod: 'excel',
+      smartTargetingSelectionOrderPending: false,
       targetAudienceExcelFileUuid:
         campaignData.segment.targetAudienceExcelFileUuid ?? '',
     });
@@ -1078,6 +1381,16 @@ const LevelStep: React.FC = () => {
       selectedTagIds: [],
       smartTargetingSelectedRawCapacity: 0,
       smartTargetingSelectionDirty: false,
+      smartTargetingScoreClasses: [],
+      smartTargetingScoreClassesDirty: false,
+      smartTargetingCapacityCalculation: null,
+      smartTargetingExactCapacityRequired: false,
+      smartTargetingSortBy: '',
+      smartTargetingSortDirection: 'desc',
+      smartTargetingSelectionOrderPending: false,
+      smartTargetingTestPreview: null,
+      smartTargetingTestPreviewInputKey: null,
+      smartTargetingTestPreviewStale: false,
       capacity: 0,
       capacityTooLow: false,
       audienceGrades: [],
@@ -1251,15 +1564,105 @@ const LevelStep: React.FC = () => {
               selectionIsDirty={
                 campaignData.segment.smartTargetingSelectionDirty === true
               }
+              preserveSelectionOrder={isSmartTargetingTest}
+              initialSortBy={campaignData.segment.smartTargetingSortBy || ''}
+              initialSortDirection={
+                campaignData.segment.smartTargetingSortDirection || 'desc'
+              }
+              onSortChange={handleSmartTargetingSortChange}
+              onSelectionOrderSyncChange={
+                handleSmartTargetingSelectionOrderSyncChange
+              }
               onSelectionChange={handleSmartTargetingSelectionChange}
               copy={t.smartTargeting}
+            />
+            {isSmartTargetingTest ? (
+              <SmartTargetingTestSamplingPreview
+                campaignUuid={campaignData.uuid || undefined}
+                bundleId={campaignData.segment.bundleId}
+                platform={campaignData.segment.platform}
+                selectedTagIds={campaignData.segment.selectedTagIds || []}
+                selectedRawCapacity={
+                  campaignData.segment.smartTargetingSelectedRawCapacity || 0
+                }
+                sampleSizePerTag={
+                  campaignData.segment.sampleSizePerTag ?? 10000
+                }
+                selectedScoreClasses={
+                  campaignData.segment.smartTargetingScoreClasses || []
+                }
+                sortBy={campaignData.segment.smartTargetingSortBy || ''}
+                sortDirection={
+                  campaignData.segment.smartTargetingSortDirection || 'desc'
+                }
+                preview={campaignData.segment.smartTargetingTestPreview}
+                previewIsCurrent={isCurrentSmartTargetingTestPreview(
+                  campaignData
+                )}
+                previewIsStale={
+                  campaignData.segment.smartTargetingTestPreviewStale === true
+                }
+                selectionOrderIsPending={
+                  campaignData.segment.smartTargetingSelectionOrderPending ===
+                  true
+                }
+                canCreateCampaign={campaignValidation.isStepCompleted(1)}
+                prepareCampaign={handlePrepareCampaignForTestPreview}
+                onSampleSizeChange={value =>
+                  updateLevel({ sampleSizePerTag: value })
+                }
+                onScoreClassesChange={value =>
+                  handleSmartTargetingScoreClassesChange(value, 'local')
+                }
+                onConfigurationPersisted={handleTestConfigurationPersisted}
+                onPreviewChange={handleTestPreviewChange}
+                copy={t.smartTargeting.testPreview}
+              />
+            ) : null}
+            <SmartTargetingExactCapacity
+              campaignUuid={campaignData.uuid || undefined}
+              selectedTagIds={campaignData.segment.selectedTagIds || []}
+              selectedRawCapacity={
+                campaignData.segment.smartTargetingSelectedRawCapacity || 0
+              }
+              selectionIsDirty={
+                campaignData.segment.smartTargetingSelectionDirty === true
+              }
+              selectedScoreClasses={
+                campaignData.segment.smartTargetingScoreClasses || []
+              }
+              scoreClassesAreDirty={
+                campaignData.segment.smartTargetingScoreClassesDirty === true
+              }
+              initialCalculation={
+                campaignData.segment.smartTargetingCapacityCalculation
+              }
+              calculationRequiredByServer={
+                campaignData.segment.smartTargetingExactCapacityRequired ===
+                true
+              }
+              canCreateCampaign={campaignValidation.isStepCompleted(1)}
+              preserveSelectionOrder={isSmartTargetingTest}
+              selectionOrderIsPending={
+                isSmartTargetingTest &&
+                campaignData.segment.smartTargetingSelectionOrderPending ===
+                  true
+              }
+              showScoreClassSelector={!isSmartTargetingTest}
+              syncScoreClassesFromCalculation={!isSmartTargetingTest}
+              ensureCampaignCreated={handleEnsureCampaignCreatedForCapacity}
+              onSelectionPersisted={handleCapacitySelectionPersisted}
+              onScoreClassesChange={handleSmartTargetingScoreClassesChange}
+              onCalculationChange={handleSmartTargetingCalculationChange}
+              copy={t.smartTargeting.exactCapacity}
             />
             {(campaignData.segment.selectedTagIds?.length ?? 0) === 0 ? (
               <p className='mt-2 text-sm text-red-600'>
                 {t.smartTargeting.validationRequired}
               </p>
-            ) : (campaignData.segment.smartTargetingSelectedRawCapacity ?? 0) <
-              500 ? (
+            ) : !isSmartTargetingTest &&
+              (campaignData.segment.smartTargetingSelectedRawCapacity ?? 0) <
+                500 ? (
               <p className='mt-2 text-sm text-red-600'>{t.capacityTooLow}</p>
             ) : null}
           </div>
@@ -1372,7 +1775,11 @@ const LevelStep: React.FC = () => {
         )}
 
         <div className='md:col-span-2 flex items-center'>
-          <Button variant='outline' onClick={handleReset}>
+          <Button
+            variant='outline'
+            onClick={handleReset}
+            disabled={isCampaignCreationPending}
+          >
             {t.reset}
           </Button>
         </div>
