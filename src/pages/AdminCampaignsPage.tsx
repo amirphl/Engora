@@ -156,6 +156,7 @@ const AdminCampaignsPage: React.FC = () => {
     submitAction,
   } = useCampaignActions({
     copy,
+    language,
     showError,
     onActionSuccess: (campaign, nextAction, comment) => {
       handleActionSuccess(campaign.uuid, nextAction, comment);
