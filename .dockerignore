@@ -186,5 +186,6 @@ scripts/
 
 # Development tools
 .eslintrc*
+!.eslintrc.cjs
 .prettierrc*
 .prettierignore
