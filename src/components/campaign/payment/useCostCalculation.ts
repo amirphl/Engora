@@ -5,6 +5,11 @@ import { useAuth } from '../../../hooks/useAuth';
 import { useToast } from '../../../hooks/useToast';
 import { useLanguage } from '../../../hooks/useLanguage';
 import { paymentI18n } from './paymentTranslations';
+import { isCurrentUsableSmartTargetingCapacity } from '../../../utils/smartTargetingCapacity';
+import {
+  hasUsableSmartTargetingTestPreview,
+  isCurrentSmartTargetingTestPreview,
+} from '../../../utils/smartTargetingTestPreview';
 
 export const useCostCalculation = (
   campaignData: CampaignData,
@@ -61,6 +66,26 @@ export const useCostCalculation = (
       campaignData.segment.targetAudienceExcelFileUuid || null;
     const tags = campaignData.segment.tags || [];
     const selectedTagIds = campaignData.segment.selectedTagIds || [];
+    const exactCapacity =
+      campaignData.segment.smartTargetingCapacityCalculation;
+    const isSmartTargetingTest =
+      audienceTargetingMethod === 'smart_targeting' &&
+      campaignData.segment.phase === 'test';
+    const currentTestPreview = isCurrentSmartTargetingTestPreview(campaignData)
+      ? campaignData.segment.smartTargetingTestPreview
+      : null;
+    const hasValidSmartTargetingSelection =
+      selectedTagIds.length > 0 &&
+      selectedTagIds.every(tagId => Number.isInteger(tagId) && tagId > 0);
+    const hasCurrentExactCapacity =
+      campaignData.segment.smartTargetingSelectionDirty !== true &&
+      campaignData.segment.smartTargetingScoreClassesDirty !== true &&
+      campaignData.segment.smartTargetingExactCapacityRequired !== true &&
+      isCurrentUsableSmartTargetingCapacity(
+        exactCapacity,
+        selectedTagIds,
+        campaignData.segment.smartTargetingScoreClasses
+      );
     const adlink = campaignData.content.insertLink
       ? campaignData.content.link
       : '';
@@ -70,6 +95,12 @@ export const useCostCalculation = (
     const platform_settings_id = campaignData.content.platformSettingsId;
     const budget = campaignData.budget.totalBudget;
     const campaignId = campaignData.id;
+    const validCampaignId =
+      typeof campaignId === 'number' &&
+      Number.isInteger(campaignId) &&
+      campaignId > 0
+        ? campaignId
+        : null;
     const clearDerivedPayment = () => {
       if (
         campaignData.payment.total !== undefined ||
@@ -97,8 +128,7 @@ export const useCostCalculation = (
 
     const hasAudienceSelection =
       audienceTargetingMethod === 'smart_targeting'
-        ? selectedTagIds.length > 0 &&
-          selectedTagIds.every(tagId => Number.isInteger(tagId) && tagId > 0)
+        ? hasValidSmartTargetingSelection
         : audienceTargetingMethod === 'excel'
           ? typeof target_audience_excel_file_uuid === 'string' &&
             target_audience_excel_file_uuid.trim().length > 0
@@ -108,21 +138,54 @@ export const useCostCalculation = (
             tags.length > 0 &&
             (campaignData.segment.audienceGrades?.length ?? 0) > 0;
 
+    const budgetIsValid = isSmartTargetingTest
+      ? hasUsableSmartTargetingTestPreview(campaignData) &&
+        Number.isSafeInteger(budget) &&
+        budget >= 0 &&
+        budget === currentTestPreview?.campaign_cost
+      : Number.isSafeInteger(budget) && budget > 0;
     if (
-      !title ||
-      !hasAudienceSelection ||
-      !content ||
-      !Number.isSafeInteger(budget) ||
-      budget <= 0
+      isSmartTargetingTest &&
+      !hasUsableSmartTargetingTestPreview(campaignData)
     ) {
+      clearCalculation();
+      setError(t.testPreviewRequiredForCostCalculation);
+      return;
+    }
+    if (!title || !hasAudienceSelection || !content || !budgetIsValid) {
       clearCalculation();
       return;
     }
     if (
-      typeof campaignId !== 'number' ||
-      !Number.isInteger(campaignId) ||
-      campaignId <= 0
+      audienceTargetingMethod === 'smart_targeting' &&
+      !isSmartTargetingTest &&
+      !hasCurrentExactCapacity
     ) {
+      clearCalculation();
+      setError(t.exactCapacityRequiredForCostCalculation);
+      return;
+    }
+    if (
+      audienceTargetingMethod === 'smart_targeting' &&
+      !isSmartTargetingTest &&
+      exactCapacity?.usable_unique_audience_count === 0
+    ) {
+      clearCalculation();
+      setError(t.zeroExactCapacity);
+      return;
+    }
+    if (
+      audienceTargetingMethod === 'smart_targeting' &&
+      !isSmartTargetingTest &&
+      (!Number.isSafeInteger(campaignData.budget.estimatedMessages) ||
+        (campaignData.budget.estimatedMessages ?? 0) >
+          (exactCapacity?.usable_unique_audience_count ?? 0))
+    ) {
+      clearCalculation();
+      setError(t.requestedAudienceExceedsExactCapacity);
+      return;
+    }
+    if (!isSmartTargetingTest && validCampaignId === null) {
       clearCalculation();
       const errorMessage = t.campaignIdRequiredForCostCalculation;
       setError(errorMessage);
@@ -150,7 +213,26 @@ export const useCostCalculation = (
       [...level3s].sort().join(','),
       target_audience_excel_file_uuid || '',
       [...tags].sort().join(','),
-      [...selectedTagIds].sort((a, b) => a - b).join(','),
+      (isSmartTargetingTest
+        ? selectedTagIds
+        : [...selectedTagIds].sort((a, b) => a - b)
+      ).join(','),
+      [...(campaignData.segment.smartTargetingScoreClasses || [])]
+        .sort()
+        .join(','),
+      exactCapacity ? String(exactCapacity.calculation_id) : '',
+      exactCapacity?.usable_unique_audience_count !== undefined
+        ? String(exactCapacity.usable_unique_audience_count)
+        : '',
+      isSmartTargetingTest
+        ? String(campaignData.segment.sampleSizePerTag ?? '')
+        : '',
+      isSmartTargetingTest
+        ? String(currentTestPreview?.effective_audience_count ?? '')
+        : '',
+      isSmartTargetingTest
+        ? String(currentTestPreview?.campaign_cost ?? '')
+        : '',
       [...(campaignData.segment.audienceGrades || [])].sort().join(','),
       campaignData.content.insertLink ? 'link:on' : 'link:off',
       adlink || '',
@@ -180,9 +262,31 @@ export const useCostCalculation = (
     setLastCalculation(0);
     clearDerivedPayment();
 
+    if (isSmartTargetingTest && currentTestPreview) {
+      const previewCost = currentTestPreview.campaign_cost;
+      const effectiveAudience = currentTestPreview.effective_audience_count;
+      setTotal(previewCost);
+      setMessageCount(effectiveAudience);
+      setLastCalculation(Date.now());
+      onUpdatePayment({
+        total: previewCost,
+        finalCost: previewCost,
+      });
+      triggeredKeyRef.current = selectionKey;
+      inFlightKeyRef.current = null;
+      setIsLoading(false);
+      return;
+    }
+
+    if (validCampaignId === null) {
+      clearCalculation();
+      setError(t.campaignIdRequiredForCostCalculation);
+      return;
+    }
+
     try {
       const response = await apiService.calculateCampaignCost({
-        campaign_id: campaignId,
+        campaign_id: validCampaignId,
         budget,
       });
       if (requestSequenceRef.current !== requestSequence) return;
