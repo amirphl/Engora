@@ -11,6 +11,8 @@ import { useCostCalculation } from './useCostCalculation';
 import { useWalletBalance } from './useWalletBalance';
 import { paymentI18n } from './paymentTranslations';
 import { useLineNumbers } from '../content/useLineNumbers';
+import { isCurrentUsableSmartTargetingCapacity } from '../../../utils/smartTargetingCapacity';
+import { hasUsableSmartTargetingTestPreview } from '../../../utils/smartTargetingTestPreview';
 
 const PaymentStep: React.FC = () => {
   const { campaignData, updatePayment } = useCampaign();
@@ -87,12 +89,27 @@ const PaymentStep: React.FC = () => {
     (campaignData.segment.targetAudienceExcelFileUuid != null
       ? 'excel'
       : 'standard');
+  const hasCurrentExactCapacity =
+    campaignData.segment.smartTargetingSelectionDirty !== true &&
+    campaignData.segment.smartTargetingScoreClassesDirty !== true &&
+    campaignData.segment.smartTargetingExactCapacityRequired !== true &&
+    isCurrentUsableSmartTargetingCapacity(
+      campaignData.segment.smartTargetingCapacityCalculation,
+      campaignData.segment.selectedTagIds,
+      campaignData.segment.smartTargetingScoreClasses
+    );
+  const isSmartTargetingTest =
+    audienceTargetingMethod === 'smart_targeting' &&
+    campaignData.segment.phase === 'test';
   const hasAudienceSelection =
     audienceTargetingMethod === 'smart_targeting'
       ? (campaignData.segment.selectedTagIds?.length ?? 0) > 0 &&
         campaignData.segment.selectedTagIds?.every(
           tagId => Number.isInteger(tagId) && tagId > 0
-        )
+        ) &&
+        (isSmartTargetingTest
+          ? hasUsableSmartTargetingTestPreview(campaignData)
+          : hasCurrentExactCapacity)
       : audienceTargetingMethod === 'excel'
         ? typeof campaignData.segment.targetAudienceExcelFileUuid ===
             'string' &&
@@ -105,7 +122,10 @@ const PaymentStep: React.FC = () => {
   const hasRequiredData = !!(
     hasAudienceSelection &&
     campaignData.content.text.trim() &&
-    campaignData.budget.totalBudget &&
+    (isSmartTargetingTest
+      ? Number.isSafeInteger(campaignData.budget.totalBudget) &&
+        campaignData.budget.totalBudget >= 0
+      : campaignData.budget.totalBudget > 0) &&
     (platform === 'sms'
       ? campaignData.content.lineNumber
       : campaignData.content.platformSettingsId)
