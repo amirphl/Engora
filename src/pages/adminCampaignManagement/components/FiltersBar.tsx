@@ -106,11 +106,16 @@ const FiltersBar: React.FC<AdminCampaignFiltersBarProps> = ({
           <DatePicker
             calendar={isFa ? persian : gregorian}
             locale={isFa ? persian_fa : gregorian_en}
-            plugins={[<TimePicker hideSeconds={false} />]}
+            plugins={[
+              <TimePicker
+                hideSeconds={false}
+                className='campaign-time-picker-24h'
+              />,
+            ]}
             value={start ? new Date(start) : undefined}
             onChange={handleDateChange(onStartChange)}
             format='YYYY/MM/DD HH:mm:ss'
-            className='w-full'
+            containerClassName='campaign-date-picker'
             inputClass='w-full rounded border px-3 py-2'
           />
         </div>
@@ -121,11 +126,16 @@ const FiltersBar: React.FC<AdminCampaignFiltersBarProps> = ({
           <DatePicker
             calendar={isFa ? persian : gregorian}
             locale={isFa ? persian_fa : gregorian_en}
-            plugins={[<TimePicker hideSeconds={false} />]}
+            plugins={[
+              <TimePicker
+                hideSeconds={false}
+                className='campaign-time-picker-24h'
+              />,
+            ]}
             value={end ? new Date(end) : undefined}
             onChange={handleDateChange(onEndChange)}
             format='YYYY/MM/DD HH:mm:ss'
-            className='w-full'
+            containerClassName='campaign-date-picker'
             inputClass='w-full rounded border px-3 py-2'
           />
         </div>
