@@ -104,7 +104,12 @@ const ScheduleCard: React.FC<ScheduleCardProps> = ({
               <DatePicker
                 calendar={isEnglish ? gregorian : persian}
                 locale={isEnglish ? gregorian_en : persian_fa}
-                plugins={[<TimePicker hideSeconds={true} />]}
+                plugins={[
+                  <TimePicker
+                    hideSeconds={true}
+                    className='campaign-time-picker-24h'
+                  />,
+                ]}
                 value={scheduleAt ? new Date(scheduleAt) : undefined}
                 onChange={(val: DateObject | null) => {
                   if (!val) {
@@ -120,7 +125,8 @@ const ScheduleCard: React.FC<ScheduleCardProps> = ({
                   }
                 }}
                 format='YYYY/MM/DD HH:mm'
-                className='w-full mt-1'
+                containerClassName='campaign-date-picker mt-1'
+                inputClass='w-full rounded border border-gray-300 px-3 py-2'
               />
               {isTooSoon && (
                 <p className='text-sm text-red-600 mt-2'>{tooSoonError}</p>
