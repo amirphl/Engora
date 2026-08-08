@@ -45,6 +45,7 @@ export interface EnvironmentConfig {
       smartTargetingCapacityCalculations: string;
       smartTargetingCapacityCalculationById: string;
       smartTargetingTestSamplingPreview: string;
+      smartTargetingTestSamplingPreviewById: string;
     };
     bundles: {
       list: string;
@@ -158,6 +159,8 @@ const localConfig: EnvironmentConfig = {
         '/campaigns/:uuid/smart-targeting/capacity-calculations/:calculation_id',
       smartTargetingTestSamplingPreview:
         '/campaigns/:uuid/smart-targeting/test-sampling-preview',
+      smartTargetingTestSamplingPreviewById:
+        '/campaigns/:uuid/smart-targeting/test-sampling-preview/:calculation_id',
     },
     bundles: {
       list: '/bundles',
