@@ -51,7 +51,12 @@ const FiltersBar: React.FC<FiltersBarProps> = ({
           <DatePicker
             calendar={language === 'fa' ? persian : gregorian}
             locale={language === 'fa' ? persian_fa : gregorian_en}
-            plugins={[<TimePicker hideSeconds={false} />]}
+            plugins={[
+              <TimePicker
+                hideSeconds={false}
+                className='campaign-time-picker-24h'
+              />,
+            ]}
             value={startDate ? new Date(startDate) : undefined}
             onChange={(val: DateObject | null) => {
               if (!val) {
@@ -66,7 +71,8 @@ const FiltersBar: React.FC<FiltersBarProps> = ({
               }
             }}
             format='YYYY/MM/DD HH:mm:ss'
-            className='w-full mt-1 rounded-lg border-2 border-primary-300 bg-gradient-to-r from-white to-blue-50 shadow-inner'
+            className='w-full rounded-lg border-2 border-primary-300 bg-gradient-to-r from-white to-blue-50 shadow-inner'
+            containerClassName='campaign-date-picker mt-1'
             inputClass='w-full px-3 py-2 text-sm font-semibold rounded-lg focus:outline-none'
           />
         </div>
@@ -80,7 +86,12 @@ const FiltersBar: React.FC<FiltersBarProps> = ({
           <DatePicker
             calendar={language === 'fa' ? persian : gregorian}
             locale={language === 'fa' ? persian_fa : gregorian_en}
-            plugins={[<TimePicker hideSeconds={false} />]}
+            plugins={[
+              <TimePicker
+                hideSeconds={false}
+                className='campaign-time-picker-24h'
+              />,
+            ]}
             value={endDate ? new Date(endDate) : undefined}
             onChange={(val: DateObject | null) => {
               if (!val) {
@@ -95,7 +106,8 @@ const FiltersBar: React.FC<FiltersBarProps> = ({
               }
             }}
             format='YYYY/MM/DD HH:mm:ss'
-            className='w-full mt-1 rounded-lg border-2 border-primary-300 bg-gradient-to-r from-white to-blue-50 shadow-inner'
+            className='w-full rounded-lg border-2 border-primary-300 bg-gradient-to-r from-white to-blue-50 shadow-inner'
+            containerClassName='campaign-date-picker mt-1'
             inputClass='w-full px-3 py-2 text-sm font-semibold rounded-lg focus:outline-none'
           />
         </div>
