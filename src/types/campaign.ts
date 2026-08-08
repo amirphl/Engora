@@ -446,6 +446,7 @@ export interface SmartTargetingCapacityCalculationResponse {
 
 export interface SmartTargetingTestSamplingTagResult {
   tag_id: number;
+  tag_display_name: string | null;
   selection_order: number;
   satisfied: boolean;
   available_count: number;
@@ -459,6 +460,28 @@ export interface SmartTargetingTestSamplingPreviewResponse {
   satisfied_tag_count: number;
   effective_audience_count: number;
   campaign_cost: number;
+}
+
+export interface SmartTargetingTestSamplingCalculationResponse {
+  calculation_id: number;
+  campaign_id: number;
+  bundle_id: number;
+  status: string;
+  is_current: boolean;
+  recalculation_required: boolean;
+  sample_size_per_tag: number;
+  tag_sampling_order: number[];
+  selected_score_classes: AudienceGrade[];
+  satisfied_tags?: SmartTargetingTestSamplingTagResult[];
+  unsatisfied_tags?: SmartTargetingTestSamplingTagResult[];
+  satisfied_tag_count?: number | null;
+  effective_audience_count?: number | null;
+  campaign_cost?: number | null;
+  created_at: string;
+  started_at?: string | null;
+  finished_at?: string | null;
+  error_code?: string | null;
+  error_message?: string | null;
 }
 
 export interface ListSMSCampaignsResponse {
