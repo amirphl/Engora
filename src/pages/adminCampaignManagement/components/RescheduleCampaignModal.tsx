@@ -89,7 +89,12 @@ const RescheduleCampaignModal: React.FC<RescheduleCampaignModalProps> = ({
               <DatePicker
                 calendar={persian}
                 locale={persian_fa}
-                plugins={[<TimePicker hideSeconds={true} />]}
+                plugins={[
+                  <TimePicker
+                    hideSeconds={true}
+                    className='campaign-time-picker-24h'
+                  />,
+                ]}
                 value={selectedDate || undefined}
                 minDate={
                   new DateObject({
@@ -100,7 +105,7 @@ const RescheduleCampaignModal: React.FC<RescheduleCampaignModalProps> = ({
                 }
                 onChange={onFaDateTimeChange}
                 format='YYYY/MM/DD HH:mm'
-                className='w-full'
+                containerClassName='campaign-date-picker'
                 inputClass='w-full rounded border border-gray-300 px-3 py-2'
               />
             ) : (
