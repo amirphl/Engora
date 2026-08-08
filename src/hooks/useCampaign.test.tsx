@@ -1,6 +1,18 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
+import {
+  beforeEach,
+  describe,
+  expect,
+  it,
+  jest as jestGlobals,
+} from '@jest/globals';
 import { CampaignProvider, useCampaign } from './useCampaign';
 import { LEVEL_SELECTION_KEY } from '../types/segment';
 
@@ -22,6 +34,28 @@ const ResetCampaignProbe = () => {
       </button>
       <output data-testid='campaign-state'>
         {JSON.stringify({ campaignData, currentStep })}
+      </output>
+    </>
+  );
+};
+
+const EnsureCampaignProbe = ({ create }: { create: () => Promise<any> }) => {
+  const { campaignData, ensureCampaignCreated, isCampaignCreationPending } =
+    useCampaign();
+  return (
+    <>
+      <button type='button' onClick={() => void ensureCampaignCreated(create)}>
+        Create A
+      </button>
+      <button type='button' onClick={() => void ensureCampaignCreated(create)}>
+        Create B
+      </button>
+      <output data-testid='creation-state'>
+        {JSON.stringify({
+          uuid: campaignData.uuid,
+          id: campaignData.id,
+          pending: isCampaignCreationPending,
+        })}
       </output>
     </>
   );
@@ -164,5 +198,45 @@ describe('CampaignProvider draft hydration', () => {
     expect(state.campaignData.segment.campaignTitle).toBe('');
     expect(localStorage.getItem('campaign_creation_step')).toBeNull();
     expect(localStorage.getItem(LEVEL_SELECTION_KEY)).toBeNull();
+  });
+
+  it('shares concurrent campaign creation attempts and stores one identity', async () => {
+    let resolveCreate: (value: any) => void = () => {};
+    const create = jestGlobals.fn(
+      () =>
+        new Promise(resolve => {
+          resolveCreate = resolve;
+        })
+    );
+    render(
+      <CampaignProvider>
+        <EnsureCampaignProbe create={create} />
+      </CampaignProvider>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create A' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create B' }));
+    expect(create).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveCreate({
+        success: true,
+        message: 'created',
+        data: {
+          message: 'created',
+          id: 12,
+          uuid: 'created-uuid',
+          status: 'initiated',
+          created_at: '2026-08-08T00:00:00Z',
+        },
+      });
+      await Promise.resolve();
+    });
+
+    await waitFor(() =>
+      expect(
+        JSON.parse(screen.getByTestId('creation-state').textContent || '{}')
+      ).toEqual({ uuid: 'created-uuid', id: 12, pending: false })
+    );
   });
 });

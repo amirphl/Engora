@@ -176,6 +176,63 @@ const campaignLevelEn = {
       previous: 'Previous',
       next: 'Next',
     },
+    exactCapacity: {
+      title: 'Exact Smart Targeting Capacity',
+      description:
+        'Calculate the deduplicated audience capacity for the current tags and score classes.',
+      scoreClassesLabel: 'Audience Score Classes',
+      classA: 'Class A',
+      classAMeaning: 'Scores above the 66th percentile',
+      classB: 'Class B',
+      classBMeaning: 'Scores between the 33rd and 66th percentiles',
+      classC: 'Class C',
+      classCMeaning: 'Scores up to the 33rd percentile',
+      allClasses: 'No restriction selected; all classes will be included.',
+      calculate: 'Calculate Exact Capacity',
+      starting: 'Requesting calculation...',
+      loadingCurrent: 'Loading the latest exact-capacity calculation...',
+      statusLabel: 'Status',
+      notCalculated: 'Not Calculated',
+      calculating: 'Calculating',
+      calculated: 'Calculated',
+      recalculationRequired: 'Recalculation Required',
+      failed: 'Calculation Failed',
+      selectedTags: 'Selected Tags',
+      selectedRawCapacity: 'Selected Raw Capacity',
+      eligibleBeforeDeduction:
+        'Eligible Unique Audience Before Approved Campaign Deduction',
+      approvedDeduction: 'Approved Campaign Audience Deduction',
+      exactUsableCapacity: 'Exact Usable Capacity',
+      audiences: 'audiences',
+      selectTags: 'Select at least one tag before calculating exact capacity.',
+      completeCampaignDataFirst:
+        'Complete the required Campaign data before calculating exact capacity.',
+      campaignWillBeCreated:
+        'This Campaign will be created before the exact-capacity calculation starts.',
+      campaignCreationFailed:
+        'The Campaign could not be created. No capacity calculation was started.',
+      serverRequiresCalculation:
+        'The Campaign could not proceed because its exact capacity is missing or stale. Calculate it before continuing.',
+      calculationInProgress: 'Exact-capacity calculation is in progress.',
+      recalculationMessage:
+        'The selected tags or audience score classes have changed. Recalculate the exact capacity to view the current exact usable capacity.',
+      calculationFailed: 'Exact-capacity calculation failed. Please try again.',
+      calculationUnavailable: 'The calculation result is unavailable.',
+      zeroCapacity: 'No usable audience capacity is currently available.',
+      fetchError:
+        'Failed to load the exact-capacity calculation. Please try again.',
+      startError:
+        'Failed to request the exact-capacity calculation. Please try again.',
+      invalidResponse: 'An invalid response was received from the server.',
+      pollingRetry:
+        'The latest status could not be loaded. Retrying automatically...',
+      pollingStopped:
+        'Status updates are delayed after repeated connection failures. Retrying automatically...',
+      selectionChangedDuringRequest:
+        'The tag or score-class selection changed during the request. Calculate again with the current selection.',
+      unknownStatus:
+        'The server returned an unsupported calculation status. Please try again.',
+    },
   },
 
   // Bundle info
@@ -391,6 +448,63 @@ const campaignLevelFa = {
       rowsPerPage: 'ردیف در صفحه',
       previous: 'قبلی',
       next: 'بعدی',
+    },
+    exactCapacity: {
+      title: 'ظرفیت دقیق هدف‌گیری هوشمند',
+      description:
+        'ظرفیت یکتای مخاطبان را برای برچسب‌ها و کلاس‌های نمره فعلی محاسبه کنید.',
+      scoreClassesLabel: 'کلاس‌های نمره مخاطب',
+      classA: 'کلاس الف',
+      classAMeaning: 'نمره‌های بالاتر از صدک ۶۶',
+      classB: 'کلاس ب',
+      classBMeaning: 'نمره‌های بین صدک ۳۳ و ۶۶',
+      classC: 'کلاس ج',
+      classCMeaning: 'نمره‌ها تا صدک ۳۳',
+      allClasses: 'محدودیتی انتخاب نشده است؛ همه کلاس‌ها لحاظ می‌شوند.',
+      calculate: 'محاسبه ظرفیت دقیق',
+      starting: 'در حال ثبت درخواست محاسبه...',
+      loadingCurrent: 'در حال بارگذاری آخرین محاسبه ظرفیت دقیق...',
+      statusLabel: 'وضعیت',
+      notCalculated: 'محاسبه نشده',
+      calculating: 'در حال محاسبه',
+      calculated: 'محاسبه شده',
+      recalculationRequired: 'نیاز به محاسبه مجدد',
+      failed: 'خطا در محاسبه',
+      selectedTags: 'تعداد برچسب‌های انتخاب‌شده',
+      selectedRawCapacity: 'ظرفیت خام انتخاب‌شده',
+      eligibleBeforeDeduction:
+        'ظرفیت یکتای واجد شرایط پیش از کسر کمپین‌های تأییدشده',
+      approvedDeduction: 'کسر ظرفیت مخاطبان کمپین‌های تأییدشده',
+      exactUsableCapacity: 'ظرفیت دقیق قابل استفاده',
+      audiences: 'مخاطب',
+      selectTags: 'برای محاسبه ظرفیت دقیق، ابتدا حداقل یک برچسب انتخاب کنید.',
+      completeCampaignDataFirst:
+        'پیش از محاسبه ظرفیت دقیق، اطلاعات الزامی ارسال را تکمیل کنید.',
+      campaignWillBeCreated:
+        'پیش از شروع محاسبه ظرفیت دقیق، این ارسال ایجاد خواهد شد.',
+      campaignCreationFailed: 'ایجاد ارسال ناموفق بود و محاسبه ظرفیت آغاز نشد.',
+      serverRequiresCalculation:
+        'ادامه ارسال به‌دلیل نبودن یا قدیمی بودن ظرفیت دقیق ممکن نیست. پیش از ادامه، ظرفیت را محاسبه کنید.',
+      calculationInProgress: 'محاسبه ظرفیت دقیق در حال انجام است.',
+      recalculationMessage:
+        'انتخاب برچسب‌ها یا کلاس نمره مخاطب تغییر کرده است. برای مشاهده ظرفیت دقیق قابل استفاده، دوباره محاسبه را انجام دهید.',
+      calculationFailed:
+        'محاسبه ظرفیت دقیق با خطا مواجه شد. لطفاً دوباره تلاش کنید.',
+      calculationUnavailable: 'نتیجه محاسبه در دسترس نیست.',
+      zeroCapacity: 'در حال حاضر ظرفیت مخاطب قابل استفاده‌ای وجود ندارد.',
+      fetchError:
+        'بارگذاری محاسبه ظرفیت دقیق ناموفق بود. لطفاً دوباره تلاش کنید.',
+      startError:
+        'ثبت درخواست محاسبه ظرفیت دقیق ناموفق بود. لطفاً دوباره تلاش کنید.',
+      invalidResponse: 'پاسخ نامعتبری از سرور دریافت شد.',
+      pollingRetry:
+        'دریافت آخرین وضعیت ناموفق بود. تلاش مجدد به‌صورت خودکار انجام می‌شود...',
+      pollingStopped:
+        'پس از چند خطای ارتباطی، به‌روزرسانی وضعیت با تأخیر مواجه شده است و تلاش مجدد به‌صورت خودکار انجام می‌شود.',
+      selectionChangedDuringRequest:
+        'انتخاب برچسب یا کلاس نمره هنگام درخواست تغییر کرد. محاسبه را برای انتخاب فعلی دوباره انجام دهید.',
+      unknownStatus:
+        'سرور وضعیت محاسبه پشتیبانی‌نشده‌ای برگرداند. لطفاً دوباره تلاش کنید.',
     },
   },
 

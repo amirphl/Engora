@@ -6,6 +6,7 @@ import {
   MAX_CAMPAIGN_STRING_LENGTH,
   validateCampaignContent,
 } from '../utils/campaignUtils';
+import { isCurrentUsableSmartTargetingCapacity } from '../utils/smartTargetingCapacity';
 
 export const useCampaignValidation = (
   campaignData: CampaignData,
@@ -35,6 +36,14 @@ export const useCampaignValidation = (
       new Set(segment.selectedTagIds ?? []).size ===
         (segment.selectedTagIds?.length ?? 0) &&
       (segment.smartTargetingSelectedRawCapacity ?? 0) >= 500;
+    const exactCapacityRequirementSatisfied =
+      segment.smartTargetingExactCapacityRequired !== true ||
+      (segment.smartTargetingSelectionDirty !== true &&
+        isCurrentUsableSmartTargetingCapacity(
+          segment.smartTargetingCapacityCalculation,
+          segment.selectedTagIds,
+          segment.smartTargetingScoreClasses
+        ));
     const audienceGradesValid =
       (segment.audienceGrades?.length ?? 0) <= 3 &&
       (segment.audienceGrades ?? []).every(
@@ -61,6 +70,7 @@ export const useCampaignValidation = (
       segment.platform &&
       (!isTargetAudienceExcelFileMode || excelFileUploaded) &&
       (!isSmartTargetingMode || hasSmartTargetingSelection) &&
+      (!isSmartTargetingMode || exactCapacityRequirementSatisfied) &&
       (isTargetAudienceExcelFileMode ||
         isSmartTargetingMode ||
         hasValidLevelSelection) &&
@@ -251,6 +261,19 @@ export const useCampaignValidation = (
             (campaignData.segment.smartTargetingSelectedRawCapacity ?? 0) < 500
           ) {
             errors.push('Audience capacity is too low');
+          }
+          if (
+            isSmartTargetingMode &&
+            campaignData.segment.smartTargetingExactCapacityRequired === true &&
+            !isCurrentUsableSmartTargetingCapacity(
+              campaignData.segment.smartTargetingCapacityCalculation,
+              campaignData.segment.selectedTagIds,
+              campaignData.segment.smartTargetingScoreClasses
+            )
+          ) {
+            errors.push(
+              'Calculate the current exact Smart Targeting capacity before continuing'
+            );
           }
           if (isAgency && !campaignData.segment.jobCategory) {
             errors.push('Please select a category');

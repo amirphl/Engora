@@ -23,6 +23,8 @@ import {
   ListSMSCampaignsResponse,
   ReplaceSmartTargetingSelectionRequest,
   SmartTargetingSelectionResponse,
+  SmartTargetingCapacityCalculationResponse,
+  StartSmartTargetingCapacityCalculationRequest,
   UploadMultimediaResponse,
 } from '../types/campaign';
 import {
@@ -43,6 +45,7 @@ import {
   CreatePlatformSettingsResponse,
   ListPlatformSettingsResponse,
 } from '../types/platformSettings';
+
 import {
   config,
   getApiUrl,
@@ -1002,6 +1005,11 @@ class ApiService {
   async createCampaign(
     campaignData: CreateCampaignPayload
   ): Promise<ApiResponse<CreateSMSCampaignResponse>> {
+    // Do not infer creation success from the account's "last initiated"
+    // Campaign. Another tab can create an indistinguishable Campaign while
+    // this request is in flight, so only the POST response can establish the
+    // identity safely. The CampaignProvider deduplicates concurrent attempts
+    // within this application instance.
     return this.request<CreateSMSCampaignResponse>(
       config.endpoints.campaigns.create,
       {
@@ -1212,6 +1220,90 @@ class ApiService {
           ? { sort_direction: payload.sort_direction }
           : {}),
       }),
+      signal,
+    });
+  }
+
+  async startSmartTargetingCapacityCalculation(
+    uuid: string,
+    payload: StartSmartTargetingCapacityCalculationRequest = {},
+    signal?: AbortSignal
+  ): Promise<ApiResponse<SmartTargetingCapacityCalculationResponse>> {
+    if (!uuid || typeof uuid !== 'string' || !uuid.trim()) {
+      return this.createErrorResponse('INVALID_CAMPAIGN_UUID');
+    }
+
+    const scoreClasses = Array.isArray(payload.score_classes)
+      ? Array.from(
+          new Set(
+            payload.score_classes.map(value =>
+              typeof value === 'string' ? value.toUpperCase() : value
+            )
+          )
+        )
+      : [];
+    if (
+      scoreClasses.length > 3 ||
+      scoreClasses.some(value => !['A', 'B', 'C'].includes(value))
+    ) {
+      return this.createErrorResponse('SMART_TARGETING_SCORE_CLASSES_INVALID');
+    }
+
+    const endpoint =
+      config.endpoints.campaigns.smartTargetingCapacityCalculations.replace(
+        ':uuid',
+        encodeURIComponent(uuid.trim())
+      );
+
+    return this.request<SmartTargetingCapacityCalculationResponse>(endpoint, {
+      method: 'POST',
+      // The backend interprets an omitted field as "reuse persisted grades".
+      // The UI interprets no checked class as all classes, so make that intent
+      // explicit and independent of older Campaign state.
+      body: JSON.stringify({
+        score_classes: scoreClasses.length > 0 ? scoreClasses : ['A', 'B', 'C'],
+      }),
+      signal,
+    });
+  }
+
+  async getCurrentSmartTargetingCapacityCalculation(
+    uuid: string,
+    signal?: AbortSignal
+  ): Promise<ApiResponse<SmartTargetingCapacityCalculationResponse>> {
+    if (!uuid || typeof uuid !== 'string' || !uuid.trim()) {
+      return this.createErrorResponse('INVALID_CAMPAIGN_UUID');
+    }
+
+    const endpoint =
+      config.endpoints.campaigns.smartTargetingCapacityCalculations.replace(
+        ':uuid',
+        encodeURIComponent(uuid.trim())
+      );
+    return this.request<SmartTargetingCapacityCalculationResponse>(endpoint, {
+      method: 'GET',
+      signal,
+    });
+  }
+
+  async getSmartTargetingCapacityCalculationById(
+    uuid: string,
+    calculationId: number,
+    signal?: AbortSignal
+  ): Promise<ApiResponse<SmartTargetingCapacityCalculationResponse>> {
+    if (!uuid || typeof uuid !== 'string' || !uuid.trim()) {
+      return this.createErrorResponse('INVALID_CAMPAIGN_UUID');
+    }
+    if (!Number.isSafeInteger(calculationId) || calculationId < 1) {
+      return this.createErrorResponse('INVALID_CALCULATION_ID');
+    }
+
+    const endpoint =
+      config.endpoints.campaigns.smartTargetingCapacityCalculationById
+        .replace(':uuid', encodeURIComponent(uuid.trim()))
+        .replace(':calculation_id', encodeURIComponent(String(calculationId)));
+    return this.request<SmartTargetingCapacityCalculationResponse>(endpoint, {
+      method: 'GET',
       signal,
     });
   }
@@ -1826,7 +1918,8 @@ class ApiService {
   // Update campaign endpoint
   async updateCampaign(
     uuid: string,
-    campaignData: UpdateSMSCampaignRequest
+    campaignData: UpdateSMSCampaignRequest,
+    signal?: AbortSignal
   ): Promise<ApiResponse<UpdateSMSCampaignResponse>> {
     if (typeof uuid !== 'string' || !uuid.trim()) {
       return this.createErrorResponse('INVALID_CAMPAIGN_UUID');
@@ -1840,6 +1933,7 @@ class ApiService {
       method: 'PUT',
       body: JSON.stringify(campaignData),
       timeoutMs: 60000,
+      signal,
     });
   }
 

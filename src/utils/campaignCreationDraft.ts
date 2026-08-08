@@ -107,6 +107,10 @@ export const createCampaignCreationDraft = (overrides?: {
       selectedTagIds: [],
       smartTargetingSelectedRawCapacity: 0,
       smartTargetingSelectionDirty: false,
+      smartTargetingScoreClasses: [],
+      smartTargetingScoreClassesDirty: false,
+      smartTargetingCapacityCalculation: null,
+      smartTargetingExactCapacityRequired: false,
       capacityTooLow: false,
       capacity: undefined,
       audienceGrades: [],
@@ -211,6 +215,15 @@ export const normalizeCampaignResponseToDraft = (
       smartTargetingSelectedRawCapacity: selectedRawCapacity,
       smartTargetingSelectionDirty:
         options?.smartTargetingSelectionDirty === true,
+      smartTargetingScoreClasses: normalizeAudienceGrades(
+        campaign.selected_score_classes ??
+          (audienceTargetingMethod === 'smart_targeting'
+            ? campaign.audience_grades
+            : undefined)
+      ),
+      smartTargetingScoreClassesDirty: false,
+      smartTargetingCapacityCalculation: null,
+      smartTargetingExactCapacityRequired: false,
       capacity,
       capacityTooLow:
         audienceTargetingMethod !== 'excel' &&
@@ -285,6 +298,7 @@ const persistCampaignCreationDraft = (draft: CampaignData) => {
     selectedTagIds: draft.segment.selectedTagIds ?? [],
     smartTargetingSelectedRawCapacity:
       draft.segment.smartTargetingSelectedRawCapacity ?? 0,
+    smartTargetingScoreClasses: draft.segment.smartTargetingScoreClasses ?? [],
     metadata: {},
     tags: draft.segment.tags || [],
     count: draft.segment.capacity || 0,

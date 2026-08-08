@@ -73,6 +73,7 @@ export const useLevelSelection = () => {
     selectedTagIds: selection.selectedTagIds,
     smartTargetingSelectedRawCapacity:
       selection.smartTargetingSelectedRawCapacity,
+    smartTargetingScoreClasses: selection.smartTargetingScoreClasses,
     metadata: selection.metadata,
     tags: selection.tags,
     count: selection.count,

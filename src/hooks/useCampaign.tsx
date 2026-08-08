@@ -16,7 +16,9 @@ import {
   AudienceTargetingMethod,
   AudienceGrade,
   CampaignPlatform,
+  CreateSMSCampaignResponse,
 } from '../types/campaign';
+import type { ApiResponse } from '../services/api';
 import { registerCampaignClearFunction } from './useAuth';
 import { clearLevelSelection } from '../types/segment';
 import {
@@ -26,6 +28,10 @@ import {
   normalizeLinkPlaceholder,
   validateCampaignContent,
 } from '../utils/campaignUtils';
+import {
+  isCurrentUsableSmartTargetingCapacity,
+  normalizeSmartTargetingCapacityCalculation,
+} from '../utils/smartTargetingCapacity';
 
 interface CampaignContextType {
   currentStep: number;
@@ -47,6 +53,10 @@ interface CampaignContextType {
   // UUID management
   setCampaignId: (id: number | undefined) => void;
   setCampaignUuid: (uuid: string) => void;
+  ensureCampaignCreated: (
+    create: () => Promise<ApiResponse<CreateSMSCampaignResponse>>
+  ) => Promise<ApiResponse<CreateSMSCampaignResponse>>;
+  isCampaignCreationPending: boolean;
 
   // Storage management
   saveCampaignData: () => void;
@@ -157,6 +167,10 @@ const createDefaultCampaignData = (): CampaignData => ({
     selectedTagIds: [],
     smartTargetingSelectedRawCapacity: 0,
     smartTargetingSelectionDirty: false,
+    smartTargetingScoreClasses: [],
+    smartTargetingScoreClassesDirty: false,
+    smartTargetingCapacityCalculation: null,
+    smartTargetingExactCapacityRequired: false,
     capacityTooLow: false,
     capacity: undefined,
     audienceGrades: [],
@@ -262,6 +276,19 @@ const normalizeStoredCampaignData = (value: unknown): CampaignData => {
         typeof storedSegment.smartTargetingSelectionDirty === 'boolean'
           ? storedSegment.smartTargetingSelectionDirty
           : normalizedSelectedTagIds.length > 0,
+      smartTargetingScoreClasses: normalizeAudienceGrades(
+        storedSegment.smartTargetingScoreClasses
+      ),
+      smartTargetingScoreClassesDirty:
+        typeof storedSegment.smartTargetingScoreClassesDirty === 'boolean'
+          ? storedSegment.smartTargetingScoreClassesDirty
+          : false,
+      smartTargetingCapacityCalculation:
+        normalizeSmartTargetingCapacityCalculation(
+          storedSegment.smartTargetingCapacityCalculation
+        ),
+      smartTargetingExactCapacityRequired:
+        storedSegment.smartTargetingExactCapacityRequired === true,
       capacityTooLow:
         typeof storedSegment.capacityTooLow === 'boolean'
           ? storedSegment.capacityTooLow
@@ -414,10 +441,18 @@ export const CampaignProvider: React.FC<CampaignProviderProps> = ({
   });
 
   const [error, setError] = useState<string | null>(null);
+  const [isCampaignCreationPending, setIsCampaignCreationPending] =
+    useState(false);
   const skipNextCampaignPersistenceRef = useRef(false);
   const skipNextStepPersistenceRef = useRef(false);
   const currentStepRef = useRef(currentStep);
+  const campaignDataRef = useRef(campaignData);
+  const campaignCreationPromiseRef = useRef<Promise<
+    ApiResponse<CreateSMSCampaignResponse>
+  > | null>(null);
+  const campaignGenerationRef = useRef(0);
   currentStepRef.current = currentStep;
+  campaignDataRef.current = campaignData;
 
   // Auto-save campaign data to localStorage whenever it changes
   useEffect(() => {
@@ -520,7 +555,10 @@ export const CampaignProvider: React.FC<CampaignProviderProps> = ({
 
   const replaceCampaignData = useCallback(
     (data: CampaignData, step: number = 1) => {
-      setCampaignData(normalizeStoredCampaignData(data));
+      campaignGenerationRef.current += 1;
+      const normalized = normalizeStoredCampaignData(data);
+      campaignDataRef.current = normalized;
+      setCampaignData(normalized);
       setCurrentStep(
         Number.isInteger(step) && step >= 1 && step <= 4 ? step : 1
       );
@@ -535,6 +573,7 @@ export const CampaignProvider: React.FC<CampaignProviderProps> = ({
         ...prev,
         uuid: uuid.trim(),
       };
+      campaignDataRef.current = updatedData;
       return updatedData;
     });
   }, []);
@@ -545,17 +584,92 @@ export const CampaignProvider: React.FC<CampaignProviderProps> = ({
         ...prev,
         id,
       };
+      campaignDataRef.current = updatedData;
       return updatedData;
     });
   }, []);
 
+  const ensureCampaignCreated = useCallback(
+    (
+      create: () => Promise<ApiResponse<CreateSMSCampaignResponse>>
+    ): Promise<ApiResponse<CreateSMSCampaignResponse>> => {
+      const current = campaignDataRef.current;
+      if (current.uuid.trim()) {
+        return Promise.resolve({
+          success: true,
+          message: 'Campaign already exists',
+          data: {
+            message: 'Campaign already exists',
+            id: current.id ?? 0,
+            uuid: current.uuid.trim(),
+            status: 'initiated',
+            created_at: '',
+          },
+        });
+      }
+
+      if (campaignCreationPromiseRef.current) {
+        return campaignCreationPromiseRef.current;
+      }
+
+      const generation = campaignGenerationRef.current;
+      setIsCampaignCreationPending(true);
+      const request = create()
+        .then(response => {
+          if (campaignGenerationRef.current !== generation) {
+            return response.success
+              ? {
+                  success: false,
+                  message: 'Campaign context changed during creation',
+                  error: {
+                    code: 'CAMPAIGN_CONTEXT_CHANGED',
+                    details: null,
+                  },
+                }
+              : response;
+          }
+          const id = response.data?.id;
+          const uuid = response.data?.uuid?.trim();
+          if (
+            response.success &&
+            uuid &&
+            Number.isInteger(id) &&
+            (id ?? 0) > 0
+          ) {
+            const updatedData: CampaignData = {
+              ...campaignDataRef.current,
+              id,
+              uuid,
+            };
+            campaignDataRef.current = updatedData;
+            setCampaignData(updatedData);
+          }
+          return response;
+        })
+        .finally(() => {
+          if (campaignCreationPromiseRef.current === request) {
+            campaignCreationPromiseRef.current = null;
+            setIsCampaignCreationPending(false);
+          }
+        });
+
+      campaignCreationPromiseRef.current = request;
+      return request;
+    },
+    []
+  );
+
   const resetCampaign = useCallback(() => {
+    if (campaignCreationPromiseRef.current) return;
+    campaignGenerationRef.current += 1;
     if (currentStepRef.current !== 1) {
       skipNextStepPersistenceRef.current = true;
     }
     setCurrentStep(1);
     skipNextCampaignPersistenceRef.current = true;
-    setCampaignData(createDefaultCampaignData());
+    const nextData = createDefaultCampaignData();
+    campaignDataRef.current = nextData;
+    setCampaignData(nextData);
     setError(null);
 
     // Clear localStorage
@@ -580,6 +694,7 @@ export const CampaignProvider: React.FC<CampaignProviderProps> = ({
 
   // Comprehensive cleanup function for logout scenarios
   const clearAllCampaignData = useCallback(() => {
+    campaignGenerationRef.current += 1;
     // Clear localStorage (includes level selection storage)
     clearCampaignData();
 
@@ -589,7 +704,9 @@ export const CampaignProvider: React.FC<CampaignProviderProps> = ({
     }
     setCurrentStep(1);
     skipNextCampaignPersistenceRef.current = true;
-    setCampaignData(createDefaultCampaignData());
+    const nextData = createDefaultCampaignData();
+    campaignDataRef.current = nextData;
+    setCampaignData(nextData);
     setError(null);
   }, [clearCampaignData]);
 
@@ -641,6 +758,14 @@ export const CampaignProvider: React.FC<CampaignProviderProps> = ({
       new Set(campaignData.segment.selectedTagIds ?? []).size ===
         (campaignData.segment.selectedTagIds?.length ?? 0) &&
       (campaignData.segment.smartTargetingSelectedRawCapacity ?? 0) >= 500;
+    const exactCapacityRequirementSatisfied =
+      campaignData.segment.smartTargetingExactCapacityRequired !== true ||
+      (campaignData.segment.smartTargetingSelectionDirty !== true &&
+        isCurrentUsableSmartTargetingCapacity(
+          campaignData.segment.smartTargetingCapacityCalculation,
+          campaignData.segment.selectedTagIds,
+          campaignData.segment.smartTargetingScoreClasses
+        ));
     if (
       campaignData.segment.campaignTitle.trim() &&
       campaignData.segment.campaignTitle.length <= MAX_CAMPAIGN_STRING_LENGTH &&
@@ -661,7 +786,7 @@ export const CampaignProvider: React.FC<CampaignProviderProps> = ({
           (campaignData.segment.capacity ?? 0) >= 500 &&
           campaignData.segment.capacityTooLow !== true
         : isSmartTargetingMode
-          ? hasSmartTargetingSelection
+          ? hasSmartTargetingSelection && exactCapacityRequirementSatisfied
           : excelFileUploaded) &&
       audienceGradesValid &&
       (!campaignData.segment.sex ||
@@ -734,6 +859,8 @@ export const CampaignProvider: React.FC<CampaignProviderProps> = ({
     replaceCampaignData,
     setCampaignId,
     setCampaignUuid,
+    ensureCampaignCreated,
+    isCampaignCreationPending,
     saveCampaignData,
     clearCampaignData,
     clearAllCampaignData,

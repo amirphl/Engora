@@ -60,6 +60,7 @@ describe('campaign creation draft normalization', () => {
       audienceTargetingMethod: 'smart_targeting',
       selectedTagIds: [3, 4],
       smartTargetingSelectedRawCapacity: 750,
+      smartTargetingScoreClasses: ['A', 'B'],
       audienceGrades: ['A', 'B'],
       sex: 'all',
       city: ['Tehran', 'Shiraz'],

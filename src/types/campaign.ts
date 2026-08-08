@@ -22,8 +22,12 @@ export interface CampaignSegment {
   selectedTagIds?: number[]; // Campaign-level Smart Targeting tag IDs
   smartTargetingSelectedRawCapacity?: number;
   smartTargetingSelectionDirty?: boolean;
+  smartTargetingScoreClasses?: AudienceGrade[];
+  smartTargetingScoreClassesDirty?: boolean;
+  smartTargetingCapacityCalculation?: SmartTargetingCapacityCalculationResponse | null;
+  smartTargetingExactCapacityRequired?: boolean;
   capacityTooLow?: boolean;
-  capacity?: number; // Total audience capacity (calculated from CSV)
+  capacity?: number; // Total audience capacity (calculated from the audience spec)
   audienceGrades?: AudienceGrade[]; // Selected audience quality grades
   sex?: string;
   city?: string[];
@@ -323,6 +327,21 @@ export interface GetCampaignResponse {
   platform_base_price?: number | null;
   media_uuid?: string | null;
   audience_grades?: AudienceGrade[];
+  calculation_id?: number | null;
+  calculation_status?: string | null;
+  selected_score_classes?: AudienceGrade[];
+  raw_audience_count?: number | null;
+  eligible_unique_audience_count_before_approved_campaign_deduction?:
+    | number
+    | null;
+  approved_campaign_audience_deduction?: number | null;
+  usable_unique_audience_count?: number | null;
+  recalculation_required?: boolean;
+  started_at?: string | null;
+  finished_at?: string | null;
+  expires_at?: string | null;
+  error_code?: string | null;
+  error_message?: string | null;
   bundle_id?: number | null;
   bundle_title?: string | null;
   phase?: CampaignPhase | string | null;
@@ -387,6 +406,34 @@ export interface SmartTargetingSelectionResponse {
   summary: SmartTargetingSelectionSummary;
 }
 
+export interface StartSmartTargetingCapacityCalculationRequest {
+  /** An empty or omitted UI selection is serialized explicitly as A+B+C. */
+  score_classes?: AudienceGrade[];
+}
+
+export interface SmartTargetingCapacityCalculationResponse {
+  calculation_id: number;
+  campaign_id: number;
+  bundle_id: number;
+  status: string;
+  is_current: boolean;
+  recalculation_required: boolean;
+  selected_score_classes: AudienceGrade[];
+  selected_tag_count: number;
+  raw_audience_count?: number | null;
+  eligible_unique_audience_count_before_approved_campaign_deduction?:
+    | number
+    | null;
+  approved_campaign_audience_deduction?: number | null;
+  usable_unique_audience_count?: number | null;
+  created_at: string;
+  started_at?: string | null;
+  finished_at?: string | null;
+  expires_at?: string | null;
+  error_code?: string | null;
+  error_message?: string | null;
+}
+
 export interface ListSMSCampaignsResponse {
   message: string;
   items: GetCampaignResponse[];
@@ -426,13 +473,30 @@ export interface ListSMSCampaignsParams {
 
 // Audience Spec types
 export interface AudienceSpecItem {
+  layer1_category: string;
+  layer2_category: string;
+  layer3_category: string;
   tags: string[];
   available_audience: number;
+  distinct_users: number;
+  black_users: number;
+  white_users: number;
+  pink_users: number;
+  weak_white: number;
+  good_white: number;
+  best_white: number;
+  weak_black: number;
+  good_black: number;
+  best_black: number;
+  weak_pink: number;
+  good_pink: number;
+  best_pink: number;
+  scored_users: number;
 }
 
 export interface AudienceSpecLevel2 {
-  metadata: Record<string, any>;
-  items: Record<string, AudienceSpecItem>;
+  metadata?: Record<string, unknown>;
+  items?: Record<string, AudienceSpecItem>;
 }
 
 // Now three levels: level1 -> level2 -> level3 -> AudienceSpecItem

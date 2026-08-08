@@ -113,4 +113,50 @@ describe('useCampaignValidation transitions', () => {
     expect(result.current.isStepCompleted(4)).toBe(true);
     expect(result.current.canFinishCampaign()).toBe(true);
   });
+
+  it('keeps exact capacity optional until a Smart Targeting update requires it', () => {
+    const campaign = createValidCampaign();
+    campaign.segment.audienceTargetingMethod = 'smart_targeting';
+    campaign.segment.selectedTagIds = [10];
+    campaign.segment.smartTargetingSelectedRawCapacity = 1500;
+    campaign.segment.audienceGrades = [];
+
+    const { result: optionalResult, unmount: unmountOptional } = renderHook(
+      () => useCampaignValidation(campaign, 3)
+    );
+    expect(optionalResult.current.isStepCompleted(1)).toBe(true);
+    expect(optionalResult.current.isStepCompleted(3)).toBe(true);
+    unmountOptional();
+
+    campaign.segment.smartTargetingExactCapacityRequired = true;
+    const { result: blockedResult, unmount: unmountBlocked } = renderHook(() =>
+      useCampaignValidation(campaign, 1)
+    );
+    expect(blockedResult.current.isStepCompleted(1)).toBe(false);
+    unmountBlocked();
+
+    campaign.segment.smartTargetingCapacityCalculation = {
+      calculation_id: 42,
+      campaign_id: 10,
+      bundle_id: 12,
+      status: 'calculated',
+      is_current: true,
+      recalculation_required: false,
+      selected_score_classes: ['A', 'B', 'C'],
+      selected_tag_count: 1,
+      usable_unique_audience_count: 800,
+      created_at: '2026-07-27T06:00:00.000Z',
+    };
+    const { result: recalculatedResult } = renderHook(() =>
+      useCampaignValidation(campaign, 1)
+    );
+    expect(recalculatedResult.current.isStepCompleted(1)).toBe(true);
+
+    campaign.segment.smartTargetingSelectionDirty = true;
+    campaign.segment.selectedTagIds = [11];
+    const { result: changedSelectionResult } = renderHook(() =>
+      useCampaignValidation(campaign, 1)
+    );
+    expect(changedSelectionResult.current.isStepCompleted(1)).toBe(false);
+  });
 });

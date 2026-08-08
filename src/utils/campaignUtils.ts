@@ -412,7 +412,15 @@ export const serializeCampaignPayload = (
     payload.finalize = options.finalize;
   }
 
-  if (
+  if (isSmartTargeting) {
+    payload.audience_grades = Array.from(
+      new Set(
+        (campaignData.segment.smartTargetingScoreClasses || []).filter(
+          grade => grade === 'A' || grade === 'B' || grade === 'C'
+        )
+      )
+    );
+  } else if (
     campaignData.segment.audienceGrades &&
     campaignData.segment.audienceGrades.length > 0
   ) {

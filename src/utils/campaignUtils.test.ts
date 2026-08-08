@@ -141,7 +141,23 @@ describe('campaignUtils API serialization', () => {
     expect(payload.level2s).toEqual(['Retail']);
     expect(payload.level3s).toEqual(['Online']);
     expect(payload.tags).toEqual(['buyer']);
-    expect(payload.audience_grades).toBeUndefined();
+    expect(payload.audience_grades).toEqual([]);
+  });
+
+  it('persists Smart Targeting score classes as campaign audience grades', () => {
+    const base = campaignData();
+    const payload = serializeCampaignPayload({
+      ...base,
+      segment: {
+        ...base.segment,
+        audienceTargetingMethod: 'smart_targeting',
+        selectedTagIds: [2],
+        smartTargetingScoreClasses: ['C', 'A'],
+        audienceGrades: ['B'],
+      },
+    });
+
+    expect(payload.audience_grades).toEqual(['C', 'A']);
   });
 
   it('serializes disabled link and schedule state with backend clear semantics', () => {

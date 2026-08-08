@@ -7,7 +7,7 @@ import { useCampaign } from '../hooks/useCampaign';
 import { useNavigation } from '../contexts/NavigationContext';
 import { useToast } from '../hooks/useToast';
 import { apiService } from '../services/api';
-import { getApiErrorMessage } from '../utils/errorHandler';
+import { getApiErrorMessage, getErrorMessage } from '../utils/errorHandler';
 import {
   serializeCampaignPayload,
   validateCampaignContent,
@@ -27,6 +27,10 @@ import {
   CreateCampaignPayload,
   UpdateSMSCampaignRequest,
 } from '../types/campaign';
+import {
+  isSmartTargetingCapacityRecalculationError,
+  normalizeSmartTargetingCapacityCalculation,
+} from '../utils/smartTargetingCapacity';
 
 const CampaignCreationPage: React.FC = () => {
   const { t } = useTranslation();
@@ -45,9 +49,8 @@ const CampaignCreationPage: React.FC = () => {
     nextStep,
     previousStep,
     goToStep,
-    setCampaignId,
-    setCampaignUuid,
     updateLevel,
+    ensureCampaignCreated,
     resetCampaign,
   } = useCampaign();
   const { showError, showSuccess } = useToast();
@@ -93,6 +96,58 @@ const CampaignCreationPage: React.FC = () => {
       apiService.setAccessToken(accessToken);
     }
   }, [accessToken]);
+
+  const handleCampaignUpdateError = (
+    response: {
+      success: boolean;
+      message?: string;
+      error?: { code?: string; details?: unknown };
+    },
+    fallbackMessage: string
+  ) => {
+    const errorCode = response.error?.code;
+    const isSmartTargeting =
+      campaignData.segment.audienceTargetingMethod === 'smart_targeting';
+    if (
+      isSmartTargeting &&
+      isSmartTargetingCapacityRecalculationError(errorCode)
+    ) {
+      const pendingCalculation = normalizeSmartTargetingCapacityCalculation(
+        response.error?.details
+      );
+      if (pendingCalculation) {
+        updateLevel({
+          smartTargetingCapacityCalculation: pendingCalculation,
+          smartTargetingScoreClasses: pendingCalculation.selected_score_classes,
+          smartTargetingScoreClassesDirty: false,
+          smartTargetingExactCapacityRequired: true,
+        });
+      } else if (campaignData.segment.smartTargetingCapacityCalculation) {
+        updateLevel({
+          smartTargetingCapacityCalculation: {
+            ...campaignData.segment.smartTargetingCapacityCalculation,
+            status: 'recalculation_required',
+            is_current: false,
+            recalculation_required: true,
+          },
+          smartTargetingExactCapacityRequired: true,
+        });
+      } else {
+        updateLevel({ smartTargetingExactCapacityRequired: true });
+      }
+      goToStep(1);
+      showError(
+        getErrorMessage(
+          errorCode,
+          language,
+          getErrorMessage('SMART_TARGETING_EXACT_CAPACITY_REQUIRED', language)
+        )
+      );
+      return;
+    }
+
+    showError(getApiErrorMessage(response, language, fallbackMessage));
+  };
 
   const handleNextStep = async () => {
     if (advancingRef.current) return;
@@ -144,29 +199,23 @@ const CampaignCreationPage: React.FC = () => {
             updatePayload
           );
           if (!response.success) {
-            const message = getApiErrorMessage(
-              response,
-              language,
-              'Failed to save campaign'
-            );
-            showError(message);
+            handleCampaignUpdateError(response, 'Failed to save campaign');
             return;
           }
         } else {
           const payload: CreateCampaignPayload =
             serializeCampaignPayload(campaignData);
-          const response = await apiService.createCampaign(payload);
+          const response = await ensureCampaignCreated(() =>
+            apiService.createCampaign(payload)
+          );
           if (
-            response.success &&
-            response.data &&
-            typeof response.data.uuid === 'string' &&
-            response.data.uuid.trim() &&
-            Number.isInteger(response.data.id) &&
-            response.data.id > 0
+            !response.success ||
+            !response.data ||
+            typeof response.data.uuid !== 'string' ||
+            !response.data.uuid.trim() ||
+            !Number.isInteger(response.data.id) ||
+            response.data.id <= 0
           ) {
-            setCampaignUuid(response.data.uuid);
-            setCampaignId(response.data.id);
-          } else {
             const errorMessage = getApiErrorMessage(
               response,
               language,
@@ -197,12 +246,10 @@ const CampaignCreationPage: React.FC = () => {
           updatePayload
         );
         if (!response.success) {
-          const message = getApiErrorMessage(
+          handleCampaignUpdateError(
             response,
-            language,
             'Failed to save campaign content'
           );
-          showError(message);
           return;
         }
         nextStep();
@@ -225,12 +272,7 @@ const CampaignCreationPage: React.FC = () => {
           updatePayload
         );
         if (!response.success) {
-          const message = getApiErrorMessage(
-            response,
-            language,
-            'Failed to save campaign budget'
-          );
-          showError(message);
+          handleCampaignUpdateError(response, 'Failed to save campaign budget');
           return;
         }
         nextStep();
@@ -325,9 +367,7 @@ const CampaignCreationPage: React.FC = () => {
           showError(t('campaign.errors.invalidScheduleTime'));
           return;
         }
-        showError(
-          getApiErrorMessage(response, language, 'Failed to update campaign')
-        );
+        handleCampaignUpdateError(response, 'Failed to update campaign');
         return;
       }
 
