@@ -198,12 +198,17 @@ const FiltersBar: React.FC<FiltersBarProps> = ({
           <DatePicker
             calendar={isFa ? persian : gregorian}
             locale={isFa ? persian_fa : gregorian_en}
-            plugins={[<TimePicker hideSeconds={false} />]}
+            plugins={[
+              <TimePicker
+                hideSeconds={false}
+                className='campaign-time-picker-24h'
+              />,
+            ]}
             value={dateValueToPickerValue(startDate)}
             onChange={handleDateChange(onStartDateChange)}
             format='YYYY/MM/DD HH:mm:ss'
             inputClass={selectCls}
-            containerClassName='w-full'
+            containerClassName='campaign-date-picker'
             placeholder={copy.startDatePlaceholder}
           />
         </div>
@@ -215,12 +220,17 @@ const FiltersBar: React.FC<FiltersBarProps> = ({
           <DatePicker
             calendar={isFa ? persian : gregorian}
             locale={isFa ? persian_fa : gregorian_en}
-            plugins={[<TimePicker hideSeconds={false} />]}
+            plugins={[
+              <TimePicker
+                hideSeconds={false}
+                className='campaign-time-picker-24h'
+              />,
+            ]}
             value={dateValueToPickerValue(endDate)}
             onChange={handleDateChange(onEndDateChange)}
             format='YYYY/MM/DD HH:mm:ss'
             inputClass={selectCls}
-            containerClassName='w-full'
+            containerClassName='campaign-date-picker'
             placeholder={copy.endDatePlaceholder}
           />
         </div>
