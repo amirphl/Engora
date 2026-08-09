@@ -25,7 +25,7 @@ import {
   SmartTargetingSelectionResponse,
   SmartTargetingCapacityCalculationResponse,
   StartSmartTargetingCapacityCalculationRequest,
-  SmartTargetingTestSamplingPreviewResponse,
+  SmartTargetingTestSamplingCalculationResponse,
   UploadMultimediaResponse,
 } from '../types/campaign';
 import {
@@ -1309,10 +1309,10 @@ class ApiService {
     });
   }
 
-  async previewSmartTargetingTestSampling(
+  async startSmartTargetingTestSamplingCalculation(
     uuid: string,
     signal?: AbortSignal
-  ): Promise<ApiResponse<SmartTargetingTestSamplingPreviewResponse>> {
+  ): Promise<ApiResponse<SmartTargetingTestSamplingCalculationResponse>> {
     if (!uuid || typeof uuid !== 'string' || !uuid.trim()) {
       return this.createErrorResponse('INVALID_CAMPAIGN_UUID');
     }
@@ -1322,11 +1322,62 @@ class ApiService {
         ':uuid',
         encodeURIComponent(uuid.trim())
       );
-    return this.request<SmartTargetingTestSamplingPreviewResponse>(endpoint, {
-      method: 'POST',
-      timeoutMs: 150000,
-      signal,
-    });
+    return this.request<SmartTargetingTestSamplingCalculationResponse>(
+      endpoint,
+      {
+        method: 'POST',
+        signal,
+      }
+    );
+  }
+
+  async getCurrentSmartTargetingTestSamplingCalculation(
+    uuid: string,
+    signal?: AbortSignal
+  ): Promise<ApiResponse<SmartTargetingTestSamplingCalculationResponse>> {
+    if (!uuid || typeof uuid !== 'string' || !uuid.trim()) {
+      return this.createErrorResponse('INVALID_CAMPAIGN_UUID');
+    }
+
+    const endpoint =
+      config.endpoints.campaigns.smartTargetingTestSamplingPreview.replace(
+        ':uuid',
+        encodeURIComponent(uuid.trim())
+      );
+    return this.request<SmartTargetingTestSamplingCalculationResponse>(
+      endpoint,
+      {
+        method: 'GET',
+        cache: 'no-store',
+        signal,
+      }
+    );
+  }
+
+  async getSmartTargetingTestSamplingCalculationById(
+    uuid: string,
+    calculationId: number,
+    signal?: AbortSignal
+  ): Promise<ApiResponse<SmartTargetingTestSamplingCalculationResponse>> {
+    if (!uuid || typeof uuid !== 'string' || !uuid.trim()) {
+      return this.createErrorResponse('INVALID_CAMPAIGN_UUID');
+    }
+    if (!Number.isSafeInteger(calculationId) || calculationId < 1) {
+      return this.createErrorResponse('INVALID_CALCULATION_ID');
+    }
+
+    const endpoint =
+      config.endpoints.campaigns.smartTargetingTestSamplingPreviewById
+        .replace(':uuid', encodeURIComponent(uuid.trim()))
+        .replace(':calculation_id', encodeURIComponent(String(calculationId)));
+    return this.request<SmartTargetingTestSamplingCalculationResponse>(
+      endpoint,
+      {
+        method: 'GET',
+        cache: 'no-store',
+        signal,
+      }
+    );
   }
 
   async hideCampaigns(
