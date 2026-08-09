@@ -40,27 +40,23 @@ describe('campaign creation API safety', () => {
     });
   });
 
-  it('posts the Smart Targeting Test preview without a request body', async () => {
+  it('submits the Smart Targeting Test sampling job without a request body', async () => {
     const fetchMock = jestGlobals.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(
         JSON.stringify({
           success: true,
           message: 'ok',
           data: {
+            calculation_id: 91,
+            campaign_id: 7,
+            bundle_id: 12,
+            status: 'queued',
+            is_current: true,
+            recalculation_required: false,
             sample_size_per_tag: 600,
             tag_sampling_order: [2],
-            satisfied_tags: [
-              {
-                tag_id: 2,
-                selection_order: 0,
-                satisfied: true,
-                available_count: 700,
-              },
-            ],
-            unsatisfied_tags: [],
-            satisfied_tag_count: 1,
-            effective_audience_count: 600,
-            campaign_cost: 84000,
+            selected_score_classes: ['A', 'B', 'C'],
+            created_at: '2026-08-16T10:00:00Z',
           },
         }),
         {
@@ -71,7 +67,9 @@ describe('campaign creation API safety', () => {
     );
 
     const response =
-      await apiService.previewSmartTargetingTestSampling('campaign-uuid');
+      await apiService.startSmartTargetingTestSamplingCalculation(
+        'campaign-uuid'
+      );
 
     expect(response.success).toBe(true);
     expect(fetchMock).toHaveBeenCalledWith(
@@ -81,6 +79,55 @@ describe('campaign creation API safety', () => {
       expect.objectContaining({ method: 'POST' })
     );
     expect(fetchMock.mock.calls[0]?.[1]?.body).toBeUndefined();
-    expect(AbortSignal.timeout).toHaveBeenCalledWith(150000);
+    expect(AbortSignal.timeout).toHaveBeenCalledWith(30000);
+  });
+
+  it('validates sampling calculation IDs before polling', async () => {
+    const fetchMock = jestGlobals.spyOn(globalThis, 'fetch');
+
+    const response =
+      await apiService.getSmartTargetingTestSamplingCalculationById(
+        'campaign-uuid',
+        Number.MAX_SAFE_INTEGER + 1
+      );
+
+    expect(response).toMatchObject({
+      success: false,
+      error: { code: 'INVALID_CALCULATION_ID' },
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('fetches current and by-ID sampling status without HTTP caching', async () => {
+    const fetchMock = jestGlobals.spyOn(globalThis, 'fetch').mockImplementation(
+      async () =>
+        new Response(JSON.stringify({ success: true, data: {} }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+    );
+
+    await apiService.getCurrentSmartTargetingTestSamplingCalculation(
+      'campaign uuid'
+    );
+    await apiService.getSmartTargetingTestSamplingCalculationById(
+      'campaign uuid',
+      91
+    );
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining(
+        '/campaigns/campaign%20uuid/smart-targeting/test-sampling-preview'
+      ),
+      expect.objectContaining({ method: 'GET', cache: 'no-store' })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining(
+        '/campaigns/campaign%20uuid/smart-targeting/test-sampling-preview/91'
+      ),
+      expect.objectContaining({ method: 'GET', cache: 'no-store' })
+    );
   });
 });
