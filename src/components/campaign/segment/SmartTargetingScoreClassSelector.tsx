@@ -17,13 +17,15 @@ interface SmartTargetingScoreClassSelectorProps {
   value: AudienceGrade[];
   onChange: (value: AudienceGrade[]) => void;
   copy: SmartTargetingScoreClassCopy;
+  required?: boolean;
+  requiredMessage?: string;
 }
 
 const SCORE_CLASSES: AudienceGrade[] = ['A', 'B', 'C'];
 
 const SmartTargetingScoreClassSelector: React.FC<
   SmartTargetingScoreClassSelectorProps
-> = ({ value, onChange, copy }) => {
+> = ({ value, onChange, copy, required = false, requiredMessage }) => {
   const normalizedValue = useMemo(
     () => normalizeSmartTargetingScoreClasses(value),
     [value]
@@ -45,7 +47,8 @@ const SmartTargetingScoreClassSelector: React.FC<
   return (
     <fieldset>
       <legend className='text-sm font-medium text-gray-900'>
-        {copy.scoreClassesLabel}
+        {copy.scoreClassesLabel}{' '}
+        {required ? <span className='text-red-600'>*</span> : null}
       </legend>
       <div className='mt-3 grid gap-3 md:grid-cols-3'>
         {SCORE_CLASSES.map(scoreClass => (
@@ -75,7 +78,12 @@ const SmartTargetingScoreClassSelector: React.FC<
         ))}
       </div>
       {normalizedValue.length === 0 ? (
-        <p className='mt-2 text-xs text-gray-600'>{copy.allClasses}</p>
+        <p
+          className={`mt-2 text-xs ${required ? 'text-red-600' : 'text-gray-600'}`}
+          role={required ? 'alert' : undefined}
+        >
+          {required ? requiredMessage || copy.allClasses : copy.allClasses}
+        </p>
       ) : null}
     </fieldset>
   );
