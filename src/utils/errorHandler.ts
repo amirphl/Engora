@@ -318,13 +318,33 @@ export const ERROR_MESSAGES: Record<string, ErrorMessage> = {
     en: 'Failed to check Smart Targeting Test sample availability',
     fa: 'بررسی موجودی نمونه تست هدف‌گیری هوشمند ناموفق بود',
   },
+  SMART_TARGETING_TEST_SAMPLING_REQUEST_FAILED: {
+    en: 'Failed to request the Smart Targeting Test sampling calculation',
+    fa: 'ثبت درخواست محاسبه نمونه تست هدف‌گیری هوشمند ناموفق بود',
+  },
+  SMART_TARGETING_TEST_SAMPLING_LOOKUP_FAILED: {
+    en: 'Failed to load the Smart Targeting Test sampling calculation',
+    fa: 'بارگذاری محاسبه نمونه تست هدف‌گیری هوشمند ناموفق بود',
+  },
+  SMART_TARGETING_TEST_SAMPLING_CALCULATION_NOT_FOUND: {
+    en: 'The Smart Targeting Test sampling calculation could not be found',
+    fa: 'محاسبه نمونه تست هدف‌گیری هوشمند موردنظر یافت نشد',
+  },
+  SMART_TARGETING_TEST_SAMPLING_ACTIVE: {
+    en: 'A Smart Targeting Test sampling calculation is already in progress',
+    fa: 'یک محاسبه نمونه تست هدف‌گیری هوشمند هم‌اکنون در حال انجام است',
+  },
+  SMART_TARGETING_TEST_SAMPLING_FAILED: {
+    en: 'Smart Targeting Test sampling calculation failed. Please try again',
+    fa: 'محاسبه نمونه تست هدف‌گیری هوشمند با خطا مواجه شد. لطفاً دوباره تلاش کنید',
+  },
   CAMPAIGN_COST_OVERFLOW: {
     en: 'The calculated campaign cost exceeds the supported range',
     fa: 'هزینه محاسبه‌شده ارسال بیش از محدوده پشتیبانی‌شده است',
   },
   INVALID_CALCULATION_ID: {
-    en: 'The capacity calculation ID is invalid',
-    fa: 'شناسه محاسبه ظرفیت نامعتبر است',
+    en: 'The calculation ID is invalid',
+    fa: 'شناسه محاسبه نامعتبر است',
   },
 
   // Bundle errors
