@@ -236,11 +236,12 @@ const campaignLevelEn = {
     testPreview: {
       title: 'Smart Targeting Test Sample',
       description:
-        'Configure the all-or-nothing sample for each selected tag and check current availability.',
+        'Configure the all-or-nothing sample here. Current availability is checked on the Budget page.',
       sampleSizeLabel: 'Sample Size per Tag',
       sampleSizeHelp:
         'Each tag must provide this full sample or it will be skipped. Changing this value does not run a preview.',
       sampleSizeInvalid: 'Enter a positive whole number for each tag.',
+      scoreClassesRequired: 'Select at least one audience score class.',
       scoreClassesLabel: 'Audience Score Classes',
       classA: 'Class A',
       classAMeaning: 'Scores above the 66th percentile',
@@ -270,6 +271,23 @@ const campaignLevelEn = {
         'The ordered tag selection could not be saved. Please try again.',
       previewFailed:
         'Test sample availability could not be checked. Please try again.',
+      loadingCurrent: 'Loading the latest Test sampling calculation...',
+      calculationInProgress:
+        'Test sample availability is being calculated. Status updates are automatic.',
+      calculationFailed:
+        'Test sample availability calculation failed. Please try again.',
+      calculationStale:
+        'This sampling calculation is no longer current. Check availability again.',
+      fetchError:
+        'Failed to load the Test sampling calculation. Please try again.',
+      startError:
+        'Failed to request the Test sampling calculation. Please try again.',
+      pollingRetry:
+        'The latest calculation status could not be loaded. Retrying automatically...',
+      pollingStopped:
+        'Status updates are delayed after repeated connection failures. Retrying automatically...',
+      unknownStatus:
+        'The server returned an unsupported sampling status. Please try again.',
       invalidResponse: 'An invalid preview response was received.',
       inputsChangedDuringRequest:
         'The Test sampling configuration changed during the request. Check availability again.',
@@ -562,11 +580,12 @@ const campaignLevelFa = {
     testPreview: {
       title: 'نمونه فاز تست هدف‌گیری هوشمند',
       description:
-        'اندازه نمونه کامل هر برچسب را تنظیم کرده و موجودی فعلی را بررسی کنید.',
+        'اندازه نمونه کامل هر برچسب را اینجا تنظیم کنید. موجودی فعلی در صفحه بودجه بررسی می‌شود.',
       sampleSizeLabel: 'اندازه نمونه برای هر برچسب',
       sampleSizeHelp:
         'هر برچسب باید کل نمونه را تأمین کند؛ در غیر این صورت رد می‌شود. تغییر این مقدار پیش‌نمایش را اجرا نمی‌کند.',
       sampleSizeInvalid: 'برای هر برچسب یک عدد صحیح مثبت وارد کنید.',
+      scoreClassesRequired: 'حداقل یک کلاس نمره مخاطب انتخاب کنید.',
       scoreClassesLabel: 'کلاس‌های نمره مخاطب',
       classA: 'کلاس الف',
       classAMeaning: 'نمره‌های بالاتر از صدک ۶۶',
@@ -594,6 +613,23 @@ const campaignLevelFa = {
         'ذخیره ترتیب برچسب‌ها ناموفق بود. لطفاً دوباره تلاش کنید.',
       previewFailed:
         'بررسی موجودی نمونه تست ناموفق بود. لطفاً دوباره تلاش کنید.',
+      loadingCurrent: 'در حال بارگذاری آخرین محاسبه نمونه تست...',
+      calculationInProgress:
+        'موجودی نمونه تست در حال محاسبه است. وضعیت به‌صورت خودکار به‌روزرسانی می‌شود.',
+      calculationFailed:
+        'محاسبه موجودی نمونه تست با خطا مواجه شد. لطفاً دوباره تلاش کنید.',
+      calculationStale:
+        'این محاسبه نمونه دیگر معتبر نیست. موجودی را دوباره بررسی کنید.',
+      fetchError:
+        'بارگذاری محاسبه نمونه تست ناموفق بود. لطفاً دوباره تلاش کنید.',
+      startError:
+        'ثبت درخواست محاسبه نمونه تست ناموفق بود. لطفاً دوباره تلاش کنید.',
+      pollingRetry:
+        'دریافت آخرین وضعیت محاسبه ناموفق بود. تلاش مجدد به‌صورت خودکار انجام می‌شود...',
+      pollingStopped:
+        'پس از چند خطای ارتباطی، به‌روزرسانی وضعیت با تأخیر مواجه شده است و تلاش مجدد به‌صورت خودکار انجام می‌شود.',
+      unknownStatus:
+        'سرور وضعیت پشتیبانی‌نشده‌ای برای محاسبه نمونه برگرداند. لطفاً دوباره تلاش کنید.',
       invalidResponse: 'پاسخ پیش‌نمایش سرور نامعتبر بود.',
       inputsChangedDuringRequest:
         'پیکربندی نمونه تست هنگام درخواست تغییر کرد. دوباره موجودی را بررسی کنید.',
