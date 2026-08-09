@@ -1,12 +1,46 @@
 import {
   CampaignData,
   CampaignSegment,
+  SmartTargetingTestSamplingCalculationResponse,
   SmartTargetingTestSamplingPreviewResponse,
   SmartTargetingTestSamplingTagResult,
 } from '../types/campaign';
-import { getEffectiveScoreClassKey } from './smartTargetingCapacity';
+import {
+  getEffectiveScoreClassKey,
+  normalizeSmartTargetingScoreClasses,
+} from './smartTargetingCapacity';
 
-export const DEFAULT_SMART_TARGETING_TEST_SAMPLE_SIZE = 10_000;
+export const DEFAULT_SMART_TARGETING_TEST_SAMPLE_SIZE = 0;
+export const SMART_TARGETING_TEST_SAMPLING_POLL_INTERVAL_MS = 12_000;
+export const SMART_TARGETING_TEST_SAMPLING_MAX_POLL_RETRIES = 3;
+
+const ACTIVE_CALCULATION_STATUSES = new Set([
+  'calculating',
+  'queued',
+  'pending',
+  'running',
+  'processing',
+]);
+const COMPLETED_CALCULATION_STATUSES = new Set([
+  'calculated',
+  'completed',
+  'succeeded',
+  'success',
+]);
+const FAILED_CALCULATION_STATUSES = new Set([
+  'failed',
+  'cancelled',
+  'canceled',
+  'expired',
+]);
+
+const normalizeStatus = (value: unknown): string =>
+  typeof value === 'string'
+    ? value
+        .trim()
+        .toLowerCase()
+        .replace(/[-\s]+/g, '_')
+    : '';
 
 const normalizePositiveSafeInteger = (value: unknown): number | null => {
   const numeric = Number(value);
@@ -57,11 +91,18 @@ const normalizeTagResult = (
   const availableCount = normalizeNonNegativeSafeInteger(
     candidate.available_count
   );
+  const tagDisplayName =
+    typeof candidate.tag_display_name === 'string'
+      ? candidate.tag_display_name.trim() || null
+      : null;
 
   if (
     tagId === null ||
     selectionOrder === null ||
     availableCount === null ||
+    (candidate.tag_display_name !== undefined &&
+      candidate.tag_display_name !== null &&
+      typeof candidate.tag_display_name !== 'string') ||
     typeof candidate.satisfied !== 'boolean'
   ) {
     return null;
@@ -69,6 +110,7 @@ const normalizeTagResult = (
 
   return {
     tag_id: tagId,
+    tag_display_name: tagDisplayName,
     selection_order: selectionOrder,
     satisfied: candidate.satisfied,
     available_count: availableCount,
@@ -171,6 +213,203 @@ export const normalizeSmartTargetingTestPreview = (
     effective_audience_count: effectiveAudienceCount,
     campaign_cost: campaignCost,
   };
+};
+
+const normalizeOptionalNonNegativeSafeInteger = (
+  value: unknown
+): number | null | undefined => {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  return normalizeNonNegativeSafeInteger(value) ?? undefined;
+};
+
+const normalizeOptionalString = (value: unknown): string | null | undefined => {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+};
+
+const normalizeOptionalTagResults = (
+  value: unknown
+): SmartTargetingTestSamplingTagResult[] | undefined => {
+  if (value === undefined || value === null) return undefined;
+  if (!Array.isArray(value)) return undefined;
+  const normalized = value.map(normalizeTagResult);
+  return normalized.some(item => item === null)
+    ? undefined
+    : (normalized as SmartTargetingTestSamplingTagResult[]);
+};
+
+export const normalizeSmartTargetingTestSamplingCalculation = (
+  value: unknown
+): SmartTargetingTestSamplingCalculationResponse | null => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const candidate = value as Record<string, unknown>;
+  const calculationId = normalizePositiveSafeInteger(candidate.calculation_id);
+  const campaignId = normalizePositiveSafeInteger(candidate.campaign_id);
+  const bundleId = normalizePositiveSafeInteger(candidate.bundle_id);
+  const status = normalizeStatus(candidate.status);
+  const sampleSizePerTag = normalizePositiveSafeInteger(
+    candidate.sample_size_per_tag
+  );
+  const tagSamplingOrder = normalizeOrderedTagIds(candidate.tag_sampling_order);
+  const selectedScoreClasses = normalizeSmartTargetingScoreClasses(
+    candidate.selected_score_classes
+  );
+  const satisfiedTags = normalizeOptionalTagResults(candidate.satisfied_tags);
+  const unsatisfiedTags = normalizeOptionalTagResults(
+    candidate.unsatisfied_tags
+  );
+  const satisfiedTagCount = normalizeOptionalNonNegativeSafeInteger(
+    candidate.satisfied_tag_count
+  );
+  const effectiveAudienceCount = normalizeOptionalNonNegativeSafeInteger(
+    candidate.effective_audience_count
+  );
+  const campaignCost = normalizeOptionalNonNegativeSafeInteger(
+    candidate.campaign_cost
+  );
+
+  if (
+    calculationId === null ||
+    campaignId === null ||
+    bundleId === null ||
+    !status ||
+    sampleSizePerTag === null ||
+    tagSamplingOrder.length === 0 ||
+    !Array.isArray(candidate.tag_sampling_order) ||
+    tagSamplingOrder.length !== candidate.tag_sampling_order.length ||
+    !Array.isArray(candidate.selected_score_classes) ||
+    selectedScoreClasses.length !== candidate.selected_score_classes.length ||
+    typeof candidate.is_current !== 'boolean' ||
+    typeof candidate.recalculation_required !== 'boolean' ||
+    typeof candidate.created_at !== 'string' ||
+    !candidate.created_at.trim() ||
+    (candidate.satisfied_tags !== undefined &&
+      candidate.satisfied_tags !== null &&
+      satisfiedTags === undefined) ||
+    (candidate.unsatisfied_tags !== undefined &&
+      candidate.unsatisfied_tags !== null &&
+      unsatisfiedTags === undefined) ||
+    (candidate.satisfied_tag_count !== undefined &&
+      candidate.satisfied_tag_count !== null &&
+      satisfiedTagCount === undefined) ||
+    (candidate.effective_audience_count !== undefined &&
+      candidate.effective_audience_count !== null &&
+      effectiveAudienceCount === undefined) ||
+    (candidate.campaign_cost !== undefined &&
+      candidate.campaign_cost !== null &&
+      campaignCost === undefined)
+  ) {
+    return null;
+  }
+
+  return {
+    calculation_id: calculationId,
+    campaign_id: campaignId,
+    bundle_id: bundleId,
+    status,
+    is_current: candidate.is_current,
+    recalculation_required: candidate.recalculation_required,
+    sample_size_per_tag: sampleSizePerTag,
+    tag_sampling_order: tagSamplingOrder,
+    selected_score_classes: selectedScoreClasses,
+    satisfied_tags: satisfiedTags,
+    unsatisfied_tags: unsatisfiedTags,
+    satisfied_tag_count: satisfiedTagCount,
+    effective_audience_count: effectiveAudienceCount,
+    campaign_cost: campaignCost,
+    created_at: candidate.created_at.trim(),
+    started_at: normalizeOptionalString(candidate.started_at),
+    finished_at: normalizeOptionalString(candidate.finished_at),
+    error_code: normalizeOptionalString(candidate.error_code),
+    error_message: normalizeOptionalString(candidate.error_message),
+  };
+};
+
+export const isSmartTargetingTestSamplingActive = (
+  calculation: SmartTargetingTestSamplingCalculationResponse | null | undefined
+): boolean =>
+  Boolean(
+    calculation &&
+    calculation.is_current &&
+    !calculation.recalculation_required &&
+    ACTIVE_CALCULATION_STATUSES.has(normalizeStatus(calculation.status))
+  );
+
+export const isSmartTargetingTestSamplingCompleted = (
+  calculation: SmartTargetingTestSamplingCalculationResponse | null | undefined
+): boolean =>
+  Boolean(
+    calculation &&
+    COMPLETED_CALCULATION_STATUSES.has(normalizeStatus(calculation.status))
+  );
+
+export const isSmartTargetingTestSamplingFailed = (
+  calculation: SmartTargetingTestSamplingCalculationResponse | null | undefined
+): boolean =>
+  Boolean(
+    calculation &&
+    FAILED_CALCULATION_STATUSES.has(normalizeStatus(calculation.status))
+  );
+
+export const isSmartTargetingTestSamplingStale = (
+  calculation: SmartTargetingTestSamplingCalculationResponse | null | undefined
+): boolean =>
+  Boolean(
+    calculation &&
+    (!calculation.is_current ||
+      calculation.recalculation_required ||
+      normalizeStatus(calculation.status) === 'recalculation_required')
+  );
+
+export const isKnownSmartTargetingTestSamplingStatus = (
+  calculation: SmartTargetingTestSamplingCalculationResponse | null | undefined
+): boolean => {
+  if (!calculation) return true;
+  const status = normalizeStatus(calculation.status);
+  return (
+    ACTIVE_CALCULATION_STATUSES.has(status) ||
+    COMPLETED_CALCULATION_STATUSES.has(status) ||
+    FAILED_CALCULATION_STATUSES.has(status) ||
+    status === 'recalculation_required'
+  );
+};
+
+export const doesSmartTargetingTestSamplingMatchInputs = (
+  calculation: SmartTargetingTestSamplingCalculationResponse,
+  tagIds: unknown,
+  sampleSizePerTag: unknown,
+  selectedScoreClasses: unknown
+): boolean =>
+  calculation.sample_size_per_tag === sampleSizePerTag &&
+  areSameOrderedTagIds(calculation.tag_sampling_order, tagIds) &&
+  getEffectiveScoreClassKey(calculation.selected_score_classes) ===
+    getEffectiveScoreClassKey(selectedScoreClasses);
+
+export const getSmartTargetingTestPreviewFromCalculation = (
+  calculation: SmartTargetingTestSamplingCalculationResponse | null | undefined
+): SmartTargetingTestSamplingPreviewResponse | null => {
+  if (
+    !calculation ||
+    !isSmartTargetingTestSamplingCompleted(calculation) ||
+    isSmartTargetingTestSamplingStale(calculation) ||
+    typeof calculation.satisfied_tag_count !== 'number' ||
+    typeof calculation.effective_audience_count !== 'number' ||
+    typeof calculation.campaign_cost !== 'number'
+  ) {
+    return null;
+  }
+
+  return normalizeSmartTargetingTestPreview({
+    sample_size_per_tag: calculation.sample_size_per_tag,
+    tag_sampling_order: calculation.tag_sampling_order,
+    satisfied_tags: calculation.satisfied_tags ?? [],
+    unsatisfied_tags: calculation.unsatisfied_tags ?? [],
+    satisfied_tag_count: calculation.satisfied_tag_count,
+    effective_audience_count: calculation.effective_audience_count,
+    campaign_cost: calculation.campaign_cost,
+  });
 };
 
 export const getSmartTargetingTestPreviewInputKey = (
