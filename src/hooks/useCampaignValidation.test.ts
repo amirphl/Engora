@@ -168,6 +168,7 @@ describe('useCampaignValidation transitions', () => {
     campaign.segment.selectedTagIds = [30, 10];
     campaign.segment.smartTargetingSelectedRawCapacity = 10;
     campaign.segment.sampleSizePerTag = 600;
+    campaign.segment.smartTargetingScoreClasses = ['A'];
     campaign.segment.smartTargetingExactCapacityRequired = true;
     campaign.segment.smartTargetingTestPreview = {
       sample_size_per_tag: 600,
@@ -175,6 +176,7 @@ describe('useCampaignValidation transitions', () => {
       satisfied_tags: [
         {
           tag_id: 30,
+          tag_display_name: 'High intent',
           selection_order: 0,
           satisfied: true,
           available_count: 800,
@@ -183,6 +185,7 @@ describe('useCampaignValidation transitions', () => {
       unsatisfied_tags: [
         {
           tag_id: 10,
+          tag_display_name: 'Dormant customers',
           selection_order: 1,
           satisfied: false,
           available_count: 500,
@@ -200,6 +203,35 @@ describe('useCampaignValidation transitions', () => {
 
     expect(result.current.isStepCompleted(1)).toBe(true);
     expect(result.current.isStepCompleted(3)).toBe(true);
+  });
+
+  it('requires Test sample size and at least one score class on Step 1', () => {
+    const campaign = createValidCampaign();
+    campaign.segment.audienceTargetingMethod = 'smart_targeting';
+    campaign.segment.phase = 'test';
+    campaign.segment.selectedTagIds = [30];
+    campaign.segment.sampleSizePerTag = 0;
+    campaign.segment.smartTargetingScoreClasses = [];
+
+    const { result, unmount } = renderHook(() =>
+      useCampaignValidation(campaign, 1)
+    );
+
+    expect(result.current.isStepCompleted(1)).toBe(false);
+    expect(result.current.getStepErrors(1)).toContain(
+      'Sample Size per Tag must be a positive whole number'
+    );
+    expect(result.current.getStepErrors(1)).toContain(
+      'Please select at least one audience score class'
+    );
+    unmount();
+
+    campaign.segment.sampleSizePerTag = 600;
+    campaign.segment.smartTargetingScoreClasses = ['A'];
+    const { result: completedResult } = renderHook(() =>
+      useCampaignValidation(campaign, 1)
+    );
+    expect(completedResult.current.isStepCompleted(1)).toBe(true);
   });
 
   it('blocks Smart Targeting Execution when the calculated audience exceeds exact usable capacity', () => {
@@ -243,6 +275,7 @@ describe('useCampaignValidation transitions', () => {
       unsatisfied_tags: [
         {
           tag_id: 30,
+          tag_display_name: 'High intent',
           selection_order: 0,
           satisfied: false,
           available_count: 500,
