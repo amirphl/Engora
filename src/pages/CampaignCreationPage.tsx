@@ -123,10 +123,10 @@ const CampaignCreationPage: React.FC = () => {
       errorCode &&
       smartTargetingTestErrorCodes.has(errorCode)
     ) {
-      if (
+      const availabilityMustBeCheckedAgain =
         errorCode === 'SMART_TARGETING_TEST_PREVIEW_REQUIRED' ||
-        errorCode === 'SMART_TARGETING_TEST_NO_SATISFIED_TAGS'
-      ) {
+        errorCode === 'SMART_TARGETING_TEST_NO_SATISFIED_TAGS';
+      if (availabilityMustBeCheckedAgain) {
         updateLevel({
           smartTargetingTestPreview: null,
           smartTargetingTestPreviewInputKey: null,
@@ -134,7 +134,7 @@ const CampaignCreationPage: React.FC = () => {
         });
         updateBudget({ totalBudget: 0, estimatedMessages: undefined });
       }
-      goToStep(1);
+      goToStep(availabilityMustBeCheckedAgain ? 3 : 1);
       showError(getErrorMessage(errorCode, language, fallbackMessage));
       return;
     }
