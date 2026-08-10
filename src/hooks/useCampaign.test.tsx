@@ -78,6 +78,7 @@ const TestPreviewInvalidationProbe = () => {
       satisfied_tags: [
         {
           tag_id: 2,
+          tag_display_name: 'High intent',
           selection_order: 0,
           satisfied: true,
           available_count: 900,
@@ -86,6 +87,7 @@ const TestPreviewInvalidationProbe = () => {
       unsatisfied_tags: [
         {
           tag_id: 1,
+          tag_display_name: 'Dormant customers',
           selection_order: 1,
           satisfied: false,
           available_count: 500,
