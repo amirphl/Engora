@@ -160,13 +160,25 @@ describe('SmartTargetingTagsTable', () => {
 
     const first = await screen.findByRole('checkbox', { name: 'First tag' });
     await click(first);
-    await click(screen.getByRole('button', { name: copy.pagination.next }));
+    const nextButton = screen.getByRole('button', {
+      name: copy.pagination.next,
+    });
+    await waitFor(() =>
+      expect((nextButton as HTMLButtonElement).disabled).toBe(false)
+    );
+    await click(nextButton);
 
     const second = await screen.findByRole('checkbox', {
       name: 'Second tag',
     });
     await click(second);
-    await click(screen.getByRole('button', { name: copy.pagination.previous }));
+    const previousButton = screen.getByRole('button', {
+      name: copy.pagination.previous,
+    });
+    await waitFor(() =>
+      expect((previousButton as HTMLButtonElement).disabled).toBe(false)
+    );
+    await click(previousButton);
 
     await waitFor(() => {
       expect(
