@@ -207,6 +207,15 @@ const BudgetStep: React.FC = () => {
     [updateBudget, updateLevel]
   );
 
+  const handleTestPreviewInvalidated = useCallback(() => {
+    updateLevel({
+      smartTargetingTestPreview: null,
+      smartTargetingTestPreviewInputKey: null,
+      smartTargetingTestPreviewStale: true,
+    });
+    updateBudget({ totalBudget: 0, estimatedMessages: undefined });
+  }, [updateBudget, updateLevel]);
+
   return (
     <div className='space-y-8'>
       <StepHeader
@@ -225,7 +234,7 @@ const BudgetStep: React.FC = () => {
             selectedRawCapacity={
               campaignData.segment.smartTargetingSelectedRawCapacity || 0
             }
-            sampleSizePerTag={campaignData.segment.sampleSizePerTag ?? 10000}
+            sampleSizePerTag={campaignData.segment.sampleSizePerTag ?? 0}
             selectedScoreClasses={
               campaignData.segment.smartTargetingScoreClasses || []
             }
@@ -241,19 +250,10 @@ const BudgetStep: React.FC = () => {
             selectionOrderIsPending={
               campaignData.segment.smartTargetingSelectionOrderPending === true
             }
-            canCreateCampaign={false}
             prepareCampaign={prepareTestPreview}
-            onSampleSizeChange={value =>
-              updateLevel({ sampleSizePerTag: value })
-            }
-            onScoreClassesChange={value =>
-              updateLevel({
-                smartTargetingScoreClasses: value,
-                smartTargetingScoreClassesDirty: true,
-              })
-            }
             onConfigurationPersisted={handleTestConfigurationPersisted}
             onPreviewChange={handleTestPreviewChange}
+            onPreviewInvalidated={handleTestPreviewInvalidated}
             copy={segmentCopy.smartTargeting.testPreview}
           />
         ) : (
