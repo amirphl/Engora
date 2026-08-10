@@ -49,6 +49,16 @@ export const useCampaignValidation = (
       Number.isSafeInteger(
         (segment.sampleSizePerTag ?? 0) * (segment.selectedTagIds?.length ?? 0)
       );
+    const smartTargetingTestScoreClassesValid =
+      Array.isArray(segment.smartTargetingScoreClasses) &&
+      segment.smartTargetingScoreClasses.length > 0 &&
+      segment.smartTargetingScoreClasses.length <= 3 &&
+      segment.smartTargetingScoreClasses.every(
+        scoreClass =>
+          scoreClass === 'A' || scoreClass === 'B' || scoreClass === 'C'
+      ) &&
+      new Set(segment.smartTargetingScoreClasses).size ===
+        segment.smartTargetingScoreClasses.length;
     const exactCapacityRequirementSatisfied =
       isSmartTargetingTest ||
       segment.smartTargetingExactCapacityRequired !== true ||
@@ -85,6 +95,7 @@ export const useCampaignValidation = (
       (!isTargetAudienceExcelFileMode || excelFileUploaded) &&
       (!isSmartTargetingMode || hasSmartTargetingSelection) &&
       (!isSmartTargetingTest || sampleSizePerTagValid) &&
+      (!isSmartTargetingTest || smartTargetingTestScoreClassesValid) &&
       (!isSmartTargetingTest ||
         segment.smartTargetingSelectionOrderPending !== true) &&
       (!isSmartTargetingMode || exactCapacityRequirementSatisfied) &&
@@ -324,9 +335,27 @@ export const useCampaignValidation = (
           if (
             isSmartTargetingTest &&
             (!Number.isSafeInteger(campaignData.segment.sampleSizePerTag) ||
-              (campaignData.segment.sampleSizePerTag ?? 0) <= 0)
+              (campaignData.segment.sampleSizePerTag ?? 0) <= 0 ||
+              !Number.isSafeInteger(
+                (campaignData.segment.sampleSizePerTag ?? 0) *
+                  (campaignData.segment.selectedTagIds?.length ?? 0)
+              ))
           ) {
             errors.push('Sample Size per Tag must be a positive whole number');
+          }
+          if (
+            isSmartTargetingTest &&
+            (!Array.isArray(campaignData.segment.smartTargetingScoreClasses) ||
+              campaignData.segment.smartTargetingScoreClasses.length === 0 ||
+              campaignData.segment.smartTargetingScoreClasses.length > 3 ||
+              !campaignData.segment.smartTargetingScoreClasses.every(
+                scoreClass =>
+                  scoreClass === 'A' || scoreClass === 'B' || scoreClass === 'C'
+              ) ||
+              new Set(campaignData.segment.smartTargetingScoreClasses).size !==
+                campaignData.segment.smartTargetingScoreClasses.length)
+          ) {
+            errors.push('Please select at least one audience score class');
           }
           if (
             isSmartTargetingTest &&
