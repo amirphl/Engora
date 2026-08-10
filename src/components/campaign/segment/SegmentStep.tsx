@@ -47,7 +47,7 @@ import TargetAudienceExcelFileUploadCard, {
 import BundleInfoCard from '../content/BundleInfoCard';
 import SmartTargetingTagsTable from './SmartTargetingTagsTable';
 import SmartTargetingExactCapacity from './SmartTargetingExactCapacity';
-import SmartTargetingTestSamplingPreview from './SmartTargetingTestSamplingPreview';
+import SmartTargetingTestSamplingConfiguration from './SmartTargetingTestSamplingConfiguration';
 import {
   normalizeCampaignResponseToDraft,
   type SmartTargetingDraftSelection,
@@ -55,10 +55,6 @@ import {
 import { serializeCampaignPayload } from '../../../utils/campaignUtils';
 import { useCampaignValidation } from '../../../hooks/useCampaignValidation';
 import { isCurrentUsableSmartTargetingCapacity } from '../../../utils/smartTargetingCapacity';
-import {
-  getSmartTargetingTestPreviewInputKey,
-  isCurrentSmartTargetingTestPreview,
-} from '../../../utils/smartTargetingTestPreview';
 
 const isAudienceTargetingMethod = (
   value: unknown
@@ -89,7 +85,6 @@ const LevelStep: React.FC = () => {
     campaignData,
     updateLevel,
     updateContent,
-    updateBudget,
     replaceCampaignData,
     resetCampaign,
     ensureCampaignCreated,
@@ -1061,95 +1056,6 @@ const LevelStep: React.FC = () => {
     [updateLevel]
   );
 
-  const handlePrepareCampaignForTestPreview = useCallback(
-    async (signal?: AbortSignal) => {
-      const current = campaignDataRef.current;
-      if (!campaignValidation.isStepCompleted(1)) {
-        return { success: false, errorCode: 'INVALID_CAMPAIGN_DATA' };
-      }
-
-      apiService.setAccessToken(accessToken || null);
-      if (current.uuid.trim()) {
-        const response = await apiService.updateCampaign(
-          current.uuid,
-          serializeCampaignPayload(current, {
-            includeContent: false,
-            includeBudget: false,
-            finalize: false,
-          }),
-          signal
-        );
-        if (!response.success) {
-          return {
-            success: false,
-            errorCode: response.error?.code || 'CAMPAIGN_UPDATE_FAILED',
-          };
-        }
-        setPersistedCampaignContext({
-          uuid: current.uuid.trim(),
-          bundleId: current.segment.bundleId ?? null,
-          audienceTargetingMethod: 'smart_targeting',
-        });
-        return { success: true, uuid: current.uuid.trim() };
-      }
-
-      const response = await ensureCampaignCreated(() =>
-        apiService.createCampaign(serializeCampaignPayload(current))
-      );
-      const uuid = response.data?.uuid?.trim();
-      if (!response.success || !uuid) {
-        return {
-          success: false,
-          errorCode: response.error?.code || 'CAMPAIGN_CREATION_FAILED',
-        };
-      }
-      setPersistedCampaignContext({
-        uuid,
-        bundleId: current.segment.bundleId ?? null,
-        audienceTargetingMethod: 'smart_targeting',
-      });
-      return { success: true, uuid };
-    },
-    [accessToken, campaignValidation, ensureCampaignCreated]
-  );
-
-  const handleTestConfigurationPersisted = useCallback(
-    (tagIds: number[], selectedRawCapacity: number) => {
-      updateLevel({
-        selectedTagIds: tagIds,
-        smartTargetingSelectedRawCapacity: selectedRawCapacity,
-        smartTargetingSelectionDirty: false,
-        smartTargetingScoreClassesDirty: false,
-      });
-    },
-    [updateLevel]
-  );
-
-  const handleTestPreviewChange = useCallback(
-    (
-      preview: NonNullable<
-        CampaignData['segment']['smartTargetingTestPreview']
-      >,
-      campaignUuid: string
-    ) => {
-      const current = campaignDataRef.current;
-      if (current.uuid.trim() !== campaignUuid.trim()) return;
-      updateLevel({
-        smartTargetingTestPreview: preview,
-        smartTargetingTestPreviewInputKey: getSmartTargetingTestPreviewInputKey(
-          campaignUuid,
-          current.segment
-        ),
-        smartTargetingTestPreviewStale: false,
-      });
-      updateBudget({
-        totalBudget: preview.campaign_cost,
-        estimatedMessages: preview.effective_audience_count,
-      });
-    },
-    [updateBudget, updateLevel]
-  );
-
   const handleSegmentationModeChange = (
     mode: 'target-audience-excel-file' | 'levels' | 'smart-targeting'
   ) => {
@@ -1577,45 +1483,20 @@ const LevelStep: React.FC = () => {
               copy={t.smartTargeting}
             />
             {isSmartTargetingTest ? (
-              <SmartTargetingTestSamplingPreview
-                campaignUuid={campaignData.uuid || undefined}
-                bundleId={campaignData.segment.bundleId}
-                platform={campaignData.segment.platform}
-                selectedTagIds={campaignData.segment.selectedTagIds || []}
-                selectedRawCapacity={
-                  campaignData.segment.smartTargetingSelectedRawCapacity || 0
+              <SmartTargetingTestSamplingConfiguration
+                selectedTagCount={
+                  campaignData.segment.selectedTagIds?.length ?? 0
                 }
-                sampleSizePerTag={
-                  campaignData.segment.sampleSizePerTag ?? 10000
-                }
+                sampleSizePerTag={campaignData.segment.sampleSizePerTag ?? 0}
                 selectedScoreClasses={
                   campaignData.segment.smartTargetingScoreClasses || []
                 }
-                sortBy={campaignData.segment.smartTargetingSortBy || ''}
-                sortDirection={
-                  campaignData.segment.smartTargetingSortDirection || 'desc'
-                }
-                preview={campaignData.segment.smartTargetingTestPreview}
-                previewIsCurrent={isCurrentSmartTargetingTestPreview(
-                  campaignData
-                )}
-                previewIsStale={
-                  campaignData.segment.smartTargetingTestPreviewStale === true
-                }
-                selectionOrderIsPending={
-                  campaignData.segment.smartTargetingSelectionOrderPending ===
-                  true
-                }
-                canCreateCampaign={campaignValidation.isStepCompleted(1)}
-                prepareCampaign={handlePrepareCampaignForTestPreview}
                 onSampleSizeChange={value =>
                   updateLevel({ sampleSizePerTag: value })
                 }
                 onScoreClassesChange={value =>
                   handleSmartTargetingScoreClassesChange(value, 'local')
                 }
-                onConfigurationPersisted={handleTestConfigurationPersisted}
-                onPreviewChange={handleTestPreviewChange}
                 copy={t.smartTargeting.testPreview}
               />
             ) : null}
