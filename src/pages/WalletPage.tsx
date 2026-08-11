@@ -109,7 +109,7 @@ const WalletPage: React.FC = () => {
         const form = document.createElement('form');
         form.method = 'POST';
         form.action = 'https://mipg.atipay.net/v1/redirect-to-gateway';
-        form.style.display = 'none';
+        form.hidden = true;
         const input = document.createElement('input');
         input.type = 'hidden';
         input.name = 'token';
