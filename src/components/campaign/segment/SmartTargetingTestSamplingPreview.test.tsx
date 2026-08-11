@@ -191,6 +191,29 @@ describe('SmartTargetingTestSamplingPreview', () => {
     );
   });
 
+  it('shows a loading icon while the latest result is being loaded', async () => {
+    let resolveCurrent: (value: typeof notFoundResponse) => void = () => {};
+    mockedApiService.getCurrentSmartTargetingTestSamplingCalculation.mockImplementation(
+      () =>
+        new Promise(resolve => {
+          resolveCurrent = resolve;
+        })
+    );
+
+    render(<SmartTargetingTestSamplingPreview {...defaultProps()} />);
+
+    const button = screen.getByRole('button', {
+      name: copy.checkAvailability,
+    });
+    expect((button as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByTestId('smart-targeting-sampling-spinner')).toBeTruthy();
+
+    await act(async () => {
+      resolveCurrent(notFoundResponse);
+      await Promise.resolve();
+    });
+  });
+
   it('keeps the button disabled with a spinner until polling completes', async () => {
     const props = defaultProps();
     mockedApiService.startSmartTargetingTestSamplingCalculation.mockResolvedValue(
@@ -234,7 +257,7 @@ describe('SmartTargetingTestSamplingPreview', () => {
     expect(screen.getByText(copy.calculationInProgress)).toBeTruthy();
 
     await act(async () => {
-      jestGlobals.advanceTimersByTime(12_000);
+      jestGlobals.advanceTimersByTime(10_000);
       await Promise.resolve();
       await Promise.resolve();
     });
@@ -381,7 +404,7 @@ describe('SmartTargetingTestSamplingPreview', () => {
       await Promise.resolve();
     });
     await act(async () => {
-      jestGlobals.advanceTimersByTime(12_000);
+      jestGlobals.advanceTimersByTime(10_000);
       await Promise.resolve();
       await Promise.resolve();
     });
