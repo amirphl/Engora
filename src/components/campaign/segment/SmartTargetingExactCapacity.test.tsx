@@ -389,6 +389,73 @@ describe('SmartTargetingExactCapacity', () => {
     ).toHaveBeenCalledTimes(1);
   });
 
+  it('shows a loading icon while an exact-capacity result is pending', async () => {
+    mockedApiService.getCurrentSmartTargetingCapacityCalculation.mockResolvedValue(
+      {
+        success: true,
+        message: 'ok',
+        data: calculation({
+          status: 'calculating',
+          raw_audience_count: null,
+          eligible_unique_audience_count_before_approved_campaign_deduction:
+            null,
+          approved_campaign_audience_deduction: null,
+          usable_unique_audience_count: null,
+        }) as any,
+      }
+    );
+
+    render(<SmartTargetingExactCapacity {...defaultProps()} />);
+
+    const button = screen.getByRole('button', { name: copy.calculate });
+    expect(
+      await screen.findByTestId('smart-targeting-capacity-spinner')
+    ).toBeTruthy();
+    expect((button as HTMLButtonElement).disabled).toBe(true);
+    expect(button.getAttribute('aria-busy')).toBe('true');
+  });
+
+  it('re-enables calculation after a terminal polling error', async () => {
+    jestGlobals.useFakeTimers();
+    mockedApiService.getCurrentSmartTargetingCapacityCalculation.mockResolvedValue(
+      {
+        success: true,
+        message: 'ok',
+        data: calculation({
+          status: 'calculating',
+          raw_audience_count: null,
+          eligible_unique_audience_count_before_approved_campaign_deduction:
+            null,
+          approved_campaign_audience_deduction: null,
+          usable_unique_audience_count: null,
+        }) as any,
+      }
+    );
+    mockedApiService.getSmartTargetingCapacityCalculationById.mockResolvedValue(
+      {
+        success: false,
+        message: 'not found',
+        error: { code: 'SMART_TARGETING_CAPACITY_CALCULATION_NOT_FOUND' },
+      }
+    );
+
+    render(<SmartTargetingExactCapacity {...defaultProps()} />);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      jestGlobals.advanceTimersByTime(12_000);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const button = screen.getByRole('button', { name: copy.calculate });
+    expect((button as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.queryByTestId('smart-targeting-capacity-spinner')).toBeNull();
+  });
+
   it('periodically refreshes a completed result and applies backend invalidation', async () => {
     jestGlobals.useFakeTimers();
     mockedApiService.getCurrentSmartTargetingCapacityCalculation
