@@ -414,12 +414,16 @@ const SmartTargetingExactCapacity: React.FC<
       }
 
       requestController = new AbortController();
-      const response =
-        await apiService.getSmartTargetingCapacityCalculationById(
+      let response;
+      try {
+        response = await apiService.getSmartTargetingCapacityCalculationById(
           uuid,
           calculationId,
           requestController.signal
         );
+      } catch {
+        response = null;
+      }
       requestController = null;
       if (
         stopped ||
@@ -429,19 +433,22 @@ const SmartTargetingExactCapacity: React.FC<
         return;
       }
 
-      if (!response.success || !response.data) {
-        const errorCode = response.error?.code || '';
+      if (!response?.success || !response.data) {
+        const errorCode = response?.error?.code || '';
         if (NON_RETRYABLE_POLL_ERRORS.has(errorCode)) {
+          baselineRef.current = null;
+          commitCalculation(null);
           setRequestError(
-            getErrorMessage(response.error?.code, language, copy.pollingStopped)
+            getErrorMessage(errorCode, language, copy.pollingStopped)
           );
           return;
         }
 
         retryCount += 1;
         if (retryCount > SMART_TARGETING_CAPACITY_MAX_POLL_RETRIES) {
+          baselineRef.current = null;
+          commitCalculation(null);
           setRequestError(copy.pollingStopped);
-          schedule(60_000);
           return;
         }
         setRequestError(copy.pollingRetry);
@@ -453,8 +460,9 @@ const SmartTargetingExactCapacity: React.FC<
         response.data
       );
       if (!normalized) {
+        baselineRef.current = null;
+        commitCalculation(null);
         setRequestError(copy.invalidResponse);
-        schedule(SMART_TARGETING_CAPACITY_POLL_INTERVAL_MS);
         return;
       }
 
@@ -878,6 +886,7 @@ const SmartTargetingExactCapacity: React.FC<
     isLoadingCurrent ||
     isStarting ||
     isActive;
+  const isButtonLoading = isLoadingCurrent || isStarting || isActive;
 
   const statusLabel = isStale
     ? copy.recalculationRequired
@@ -944,8 +953,20 @@ const SmartTargetingExactCapacity: React.FC<
           onClick={() => void handleCalculate()}
           disabled={calculateDisabled}
           aria-describedby='smart-targeting-capacity-guidance'
+          aria-busy={isButtonLoading}
         >
-          {isStarting ? copy.starting : copy.calculate}
+          {isButtonLoading ? (
+            <span className='flex items-center gap-2'>
+              <RefreshCw
+                className='h-4 w-4 animate-spin'
+                aria-hidden='true'
+                data-testid='smart-targeting-capacity-spinner'
+              />
+              {isStarting ? copy.starting : copy.calculate}
+            </span>
+          ) : (
+            copy.calculate
+          )}
         </Button>
       </div>
 
