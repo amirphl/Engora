@@ -456,16 +456,14 @@ const SmartTargetingTestSamplingPreview: React.FC<
         }
 
         retryCount += 1;
-        setError(
-          retryCount > SMART_TARGETING_TEST_SAMPLING_MAX_POLL_RETRIES
-            ? copy.pollingStopped
-            : copy.pollingRetry
-        );
-        schedule(
-          retryCount > SMART_TARGETING_TEST_SAMPLING_MAX_POLL_RETRIES
-            ? 60_000
-            : SMART_TARGETING_TEST_SAMPLING_POLL_INTERVAL_MS * retryCount
-        );
+        if (retryCount > SMART_TARGETING_TEST_SAMPLING_MAX_POLL_RETRIES) {
+          invalidateStoredPreview();
+          setJob(null);
+          setError(copy.pollingStopped);
+          return;
+        }
+        setError(copy.pollingRetry);
+        schedule(SMART_TARGETING_TEST_SAMPLING_POLL_INTERVAL_MS * retryCount);
         return;
       }
 
@@ -717,6 +715,7 @@ const SmartTargetingTestSamplingPreview: React.FC<
 
   const isCalculating =
     isSubmitting || isSmartTargetingTestSamplingActive(job?.calculation);
+  const isButtonLoading = isLoadingCurrent || isCalculating;
 
   const formatNumber = (value: number) => value.toLocaleString(locale);
   const displayTagName = (item: SmartTargetingTestSamplingTagResult) =>
@@ -787,16 +786,18 @@ const SmartTargetingTestSamplingPreview: React.FC<
             !requestedAudienceIsValid ||
             !campaignUuid?.trim()
           }
-          aria-busy={isCalculating}
+          aria-busy={isButtonLoading}
         >
-          {isCalculating ? (
+          {isButtonLoading ? (
             <span className='flex items-center gap-2'>
               <RefreshCw
                 className='h-4 w-4 animate-spin'
                 aria-hidden='true'
                 data-testid='smart-targeting-sampling-spinner'
               />
-              {copy.checkingAvailability}
+              {isCalculating
+                ? copy.checkingAvailability
+                : copy.checkAvailability}
             </span>
           ) : (
             copy.checkAvailability
