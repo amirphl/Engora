@@ -113,6 +113,9 @@ const normalizePositiveInteger = (value: unknown): number | null => {
   return Number.isInteger(numeric) && numeric > 0 ? numeric : null;
 };
 
+const normalizeFiniteNumber = (value: unknown): number | null =>
+  typeof value === 'number' && Number.isFinite(value) ? value : null;
+
 const normalizeTagIds = (value: unknown): number[] => {
   if (!Array.isArray(value)) return [];
   return Array.from(
@@ -162,34 +165,31 @@ const normalizeRows = (items: unknown): SmartTargetingTagItem[] => {
           typeof row.tag_display_title === 'string'
             ? row.tag_display_title
             : null,
-        tag_capacity:
-          typeof row.tag_capacity === 'number' &&
-          Number.isFinite(row.tag_capacity)
-            ? row.tag_capacity
-            : null,
-        bundle_persona_fit_score:
-          typeof row.bundle_persona_fit_score === 'number' &&
-          Number.isFinite(row.bundle_persona_fit_score)
-            ? row.bundle_persona_fit_score
-            : null,
-        evaluation_run_id:
-          typeof row.evaluation_run_id === 'number' &&
-          Number.isFinite(row.evaluation_run_id)
-            ? row.evaluation_run_id
-            : null,
+        tag_capacity: normalizeFiniteNumber(row.tag_capacity),
+        bundle_persona_fit_score: normalizeFiniteNumber(
+          row.bundle_persona_fit_score
+        ),
+        evaluation_run_id: normalizeFiniteNumber(row.evaluation_run_id),
         fit_level: typeof row.fit_level === 'string' ? row.fit_level : null,
         relation_type:
           typeof row.relation_type === 'string' ? row.relation_type : null,
-        test_phase_avg_ctr:
-          typeof row.test_phase_avg_ctr === 'number' &&
-          Number.isFinite(row.test_phase_avg_ctr)
-            ? row.test_phase_avg_ctr
-            : null,
-        overall_avg_ctr:
-          typeof row.overall_avg_ctr === 'number' &&
-          Number.isFinite(row.overall_avg_ctr)
-            ? row.overall_avg_ctr
-            : null,
+        test_phase_avg_ctr: normalizeFiniteNumber(row.test_phase_avg_ctr),
+        total_test_selected_count: normalizeFiniteNumber(
+          row.total_test_selected_count
+        ),
+        total_test_sent_count: normalizeFiniteNumber(row.total_test_sent_count),
+        total_test_delivered_count: normalizeFiniteNumber(
+          row.total_test_delivered_count
+        ),
+        total_test_click_count: normalizeFiniteNumber(
+          row.total_test_click_count
+        ),
+        selected_count: normalizeFiniteNumber(row.selected_count),
+        sent_count: normalizeFiniteNumber(row.sent_count),
+        delivered_count: normalizeFiniteNumber(row.delivered_count),
+        click_count: normalizeFiniteNumber(row.click_count),
+        test_campaign_ctr: normalizeFiniteNumber(row.test_campaign_ctr),
+        overall_avg_ctr: normalizeFiniteNumber(row.overall_avg_ctr),
         selected: row.selected === true,
       };
     })
