@@ -886,7 +886,6 @@ const SmartTargetingExactCapacity: React.FC<
     isLoadingCurrent ||
     isStarting ||
     isActive;
-  const isButtonLoading = isLoadingCurrent || isStarting || isActive;
 
   const statusLabel = isStale
     ? copy.recalculationRequired
@@ -949,25 +948,30 @@ const SmartTargetingExactCapacity: React.FC<
           <span className='font-medium'>{copy.statusLabel}:</span>{' '}
           <span>{isLoadingCurrent ? copy.loadingCurrent : statusLabel}</span>
         </div>
-        <Button
-          onClick={() => void handleCalculate()}
-          disabled={calculateDisabled}
-          aria-describedby='smart-targeting-capacity-guidance'
-          aria-busy={isButtonLoading}
-        >
-          {isButtonLoading ? (
-            <span className='flex items-center gap-2'>
-              <RefreshCw
-                className='h-4 w-4 animate-spin'
-                aria-hidden='true'
-                data-testid='smart-targeting-capacity-spinner'
-              />
-              {isStarting ? copy.starting : copy.calculate}
-            </span>
-          ) : (
-            copy.calculate
-          )}
-        </Button>
+        {isActive ? (
+          <div
+            className='inline-flex items-center justify-center gap-2 rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white opacity-50'
+            role='status'
+            aria-label={copy.calculating}
+            aria-busy='true'
+          >
+            <RefreshCw
+              className='h-4 w-4 animate-spin'
+              aria-hidden='true'
+              data-testid='smart-targeting-capacity-spinner'
+            />
+            {copy.calculating}
+          </div>
+        ) : (
+          <Button
+            onClick={() => void handleCalculate()}
+            disabled={calculateDisabled}
+            aria-describedby='smart-targeting-capacity-guidance'
+            aria-busy={isLoadingCurrent || isStarting}
+          >
+            {isStarting ? copy.starting : copy.calculate}
+          </Button>
+        )}
       </div>
 
       <div
