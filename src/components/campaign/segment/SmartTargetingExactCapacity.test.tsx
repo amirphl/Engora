@@ -389,7 +389,7 @@ describe('SmartTargetingExactCapacity', () => {
     ).toHaveBeenCalledTimes(1);
   });
 
-  it('shows a loading icon while an exact-capacity result is pending', async () => {
+  it('replaces the calculate button while exact capacity is calculating', async () => {
     mockedApiService.getCurrentSmartTargetingCapacityCalculation.mockResolvedValue(
       {
         success: true,
@@ -407,13 +407,38 @@ describe('SmartTargetingExactCapacity', () => {
 
     render(<SmartTargetingExactCapacity {...defaultProps()} />);
 
-    const button = screen.getByRole('button', { name: copy.calculate });
     expect(
       await screen.findByTestId('smart-targeting-capacity-spinner')
     ).toBeTruthy();
-    expect((button as HTMLButtonElement).disabled).toBe(true);
-    expect(button.getAttribute('aria-busy')).toBe('true');
+    const indicator = screen.getByRole('status', { name: copy.calculating });
+    expect(indicator.getAttribute('aria-busy')).toBe('true');
+    expect(screen.queryByRole('button', { name: copy.calculate })).toBeNull();
   });
+
+  it.each(['calculated', 'failed'])(
+    'shows the calculate button when exact-capacity status is %s',
+    async status => {
+      mockedApiService.getCurrentSmartTargetingCapacityCalculation.mockResolvedValue(
+        {
+          success: true,
+          message: 'ok',
+          data: calculation({ status }) as any,
+        }
+      );
+
+      render(<SmartTargetingExactCapacity {...defaultProps()} />);
+
+      const button = await screen.findByRole('button', {
+        name: copy.calculate,
+      });
+      await waitFor(() =>
+        expect(button.getAttribute('aria-busy')).toBe('false')
+      );
+      expect(
+        screen.queryByTestId('smart-targeting-capacity-spinner')
+      ).toBeNull();
+    }
+  );
 
   it('re-enables calculation after a terminal polling error', async () => {
     jestGlobals.useFakeTimers();
