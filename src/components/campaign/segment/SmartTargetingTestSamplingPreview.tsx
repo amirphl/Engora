@@ -713,9 +713,10 @@ const SmartTargetingTestSamplingPreview: React.FC<
     }
   };
 
-  const isCalculating =
-    isSubmitting || isSmartTargetingTestSamplingActive(job?.calculation);
-  const isButtonLoading = isLoadingCurrent || isCalculating;
+  const hasActiveCalculation = isSmartTargetingTestSamplingActive(
+    job?.calculation
+  );
+  const isCalculating = isSubmitting || hasActiveCalculation;
 
   const formatNumber = (value: number) => value.toLocaleString(locale);
   const displayTagName = (item: SmartTargetingTestSamplingTagResult) =>
@@ -775,34 +776,37 @@ const SmartTargetingTestSamplingPreview: React.FC<
                     ? copy.previewRequired
                     : ''}
         </p>
-        <Button
-          onClick={() => void handlePreview()}
-          disabled={
-            isCalculating ||
-            isLoadingCurrent ||
-            orderedTagIds.length === 0 ||
-            selectionOrderIsPending ||
-            !sampleSizeIsValid ||
-            !requestedAudienceIsValid ||
-            !campaignUuid?.trim()
-          }
-          aria-busy={isButtonLoading}
-        >
-          {isButtonLoading ? (
-            <span className='flex items-center gap-2'>
-              <RefreshCw
-                className='h-4 w-4 animate-spin'
-                aria-hidden='true'
-                data-testid='smart-targeting-sampling-spinner'
-              />
-              {isCalculating
-                ? copy.checkingAvailability
-                : copy.checkAvailability}
-            </span>
-          ) : (
-            copy.checkAvailability
-          )}
-        </Button>
+        {hasActiveCalculation ? (
+          <div
+            className='inline-flex items-center justify-center gap-2 rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white opacity-50'
+            role='status'
+            aria-label={copy.checkingAvailability}
+            aria-busy='true'
+          >
+            <RefreshCw
+              className='h-4 w-4 animate-spin'
+              aria-hidden='true'
+              data-testid='smart-targeting-sampling-spinner'
+            />
+            {copy.checkingAvailability}
+          </div>
+        ) : (
+          <Button
+            onClick={() => void handlePreview()}
+            disabled={
+              isSubmitting ||
+              isLoadingCurrent ||
+              orderedTagIds.length === 0 ||
+              selectionOrderIsPending ||
+              !sampleSizeIsValid ||
+              !requestedAudienceIsValid ||
+              !campaignUuid?.trim()
+            }
+            aria-busy={isLoadingCurrent || isSubmitting}
+          >
+            {copy.checkAvailability}
+          </Button>
+        )}
       </div>
 
       {!isCalculating && currentPreview ? (
