@@ -366,14 +366,23 @@ export interface PaginationInfo {
 
 export interface SmartTargetingTagItem {
   tag_id: number;
-  tag_display_title?: string | null;
-  tag_capacity?: number | null;
-  bundle_persona_fit_score?: number | null;
-  evaluation_run_id?: number | null;
-  fit_level?: string | null;
-  relation_type?: string | null;
-  test_phase_avg_ctr?: number | null;
-  overall_avg_ctr?: number | null;
+  tag_display_title: string | null;
+  tag_capacity: number | null;
+  bundle_persona_fit_score: number | null;
+  evaluation_run_id: number | null;
+  fit_level: string | null;
+  relation_type: string | null;
+  test_phase_avg_ctr: number | null;
+  total_test_selected_count: number | null;
+  total_test_sent_count: number | null;
+  total_test_delivered_count: number | null;
+  total_test_click_count: number | null;
+  selected_count: number | null;
+  sent_count: number | null;
+  delivered_count: number | null;
+  click_count: number | null;
+  test_campaign_ctr: number | null;
+  overall_avg_ctr: number | null;
   selected: boolean;
 }
 
