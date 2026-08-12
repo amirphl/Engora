@@ -191,7 +191,7 @@ describe('SmartTargetingTestSamplingPreview', () => {
     );
   });
 
-  it('shows a loading icon while the latest result is being loaded', async () => {
+  it('keeps the regular button while the latest result is being loaded', async () => {
     let resolveCurrent: (value: typeof notFoundResponse) => void = () => {};
     mockedApiService.getCurrentSmartTargetingTestSamplingCalculation.mockImplementation(
       () =>
@@ -206,21 +206,24 @@ describe('SmartTargetingTestSamplingPreview', () => {
       name: copy.checkAvailability,
     });
     expect((button as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByTestId('smart-targeting-sampling-spinner')).toBeTruthy();
+    expect(screen.queryByTestId('smart-targeting-sampling-spinner')).toBeNull();
 
     await act(async () => {
       resolveCurrent(notFoundResponse);
       await Promise.resolve();
     });
+    await waitFor(() =>
+      expect((button as HTMLButtonElement).disabled).toBe(false)
+    );
   });
 
-  it('keeps the button disabled with a spinner until polling completes', async () => {
+  it('replaces the button with a loading indicator until polling completes', async () => {
     const props = defaultProps();
     mockedApiService.startSmartTargetingTestSamplingCalculation.mockResolvedValue(
       {
         success: true,
         message: 'accepted',
-        data: calculation() as any,
+        data: calculation({ status: 'calculating' }) as any,
       }
     );
     mockedApiService.getSmartTargetingTestSamplingCalculationById.mockResolvedValue(
@@ -249,10 +252,13 @@ describe('SmartTargetingTestSamplingPreview', () => {
       await Promise.resolve();
     });
 
-    const calculatingButton = screen.getByRole('button', {
+    const calculatingIndicator = screen.getByRole('status', {
       name: copy.checkingAvailability,
     });
-    expect((calculatingButton as HTMLButtonElement).disabled).toBe(true);
+    expect(calculatingIndicator.getAttribute('aria-busy')).toBe('true');
+    expect(
+      screen.queryByRole('button', { name: copy.checkAvailability })
+    ).toBeNull();
     expect(screen.getByTestId('smart-targeting-sampling-spinner')).toBeTruthy();
     expect(screen.getByText(copy.calculationInProgress)).toBeTruthy();
 
@@ -293,10 +299,13 @@ describe('SmartTargetingTestSamplingPreview', () => {
 
     render(<SmartTargetingTestSamplingPreview {...defaultProps()} />);
 
-    const button = await screen.findByRole('button', {
+    const indicator = await screen.findByRole('status', {
       name: copy.checkingAvailability,
     });
-    expect((button as HTMLButtonElement).disabled).toBe(true);
+    expect(indicator.getAttribute('aria-busy')).toBe('true');
+    expect(
+      screen.queryByRole('button', { name: copy.checkAvailability })
+    ).toBeNull();
     expect(
       mockedApiService.startSmartTargetingTestSamplingCalculation
     ).not.toHaveBeenCalled();
@@ -328,11 +337,13 @@ describe('SmartTargetingTestSamplingPreview', () => {
     );
     fireEvent.click(button);
 
+    const indicator = await screen.findByRole('status', {
+      name: copy.checkingAvailability,
+    });
+    expect(indicator.getAttribute('aria-busy')).toBe('true');
     expect(
-      (await screen.findByRole('button', {
-        name: copy.checkingAvailability,
-      })) as HTMLButtonElement
-    ).toHaveProperty('disabled', true);
+      screen.queryByRole('button', { name: copy.checkAvailability })
+    ).toBeNull();
     expect(
       mockedApiService.startSmartTargetingTestSamplingCalculation
     ).toHaveBeenCalledTimes(1);
