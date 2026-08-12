@@ -157,8 +157,9 @@ __tests__/
 docs/
 *.md
 
-# Scripts (not needed in production)
+# Scripts are excluded by default; keep build-time npm lifecycle dependencies.
 scripts/
+!scripts/prepare-csp-dependencies.mjs
 
 # Configuration files that might contain secrets
 *.config.js
