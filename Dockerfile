@@ -21,7 +21,9 @@ RUN npm config set registry ${NPM_REGISTRY} && \
     npm config set fetch-retry-mintimeout 5000 && \
     npm config set fetch-retry-maxtimeout 60000 && \
     npm config set fetch-retry-factor 2 && \
-    npm ci --no-audit --no-fund
+    # The React build runs ESLint and therefore needs lint/config packages from
+    # devDependencies even though NODE_ENV is production in this stage.
+    npm ci --include=dev --no-audit --no-fund
 
 # Copy source code
 COPY . .
