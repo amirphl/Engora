@@ -73,7 +73,7 @@ const completedPreview = {
 };
 
 const completedCalculation = calculation({
-  status: 'completed',
+  status: 'calculated',
   ...completedPreview,
 });
 
@@ -226,13 +226,13 @@ describe('SmartTargetingTestSamplingPreview', () => {
         data: calculation({ status: 'calculating' }) as any,
       }
     );
-    mockedApiService.getSmartTargetingTestSamplingCalculationById.mockResolvedValue(
-      {
+    mockedApiService.getCurrentSmartTargetingTestSamplingCalculation
+      .mockResolvedValueOnce(notFoundResponse)
+      .mockResolvedValueOnce({
         success: true,
         message: 'ok',
         data: completedCalculation as any,
-      }
-    );
+      });
 
     render(<SmartTargetingTestSamplingPreview {...props} />);
     expect(screen.queryByRole('spinbutton')).toBeNull();
@@ -252,7 +252,7 @@ describe('SmartTargetingTestSamplingPreview', () => {
       await Promise.resolve();
     });
 
-    const calculatingIndicator = screen.getByRole('status', {
+    const calculatingIndicator = screen.getByRole('button', {
       name: copy.checkingAvailability,
     });
     expect(calculatingIndicator.getAttribute('aria-busy')).toBe('true');
@@ -269,8 +269,8 @@ describe('SmartTargetingTestSamplingPreview', () => {
     });
 
     expect(
-      mockedApiService.getSmartTargetingTestSamplingCalculationById
-    ).toHaveBeenCalledWith('campaign-uuid', 91, expect.any(AbortSignal));
+      mockedApiService.getCurrentSmartTargetingTestSamplingCalculation
+    ).toHaveBeenLastCalledWith('campaign-uuid', expect.any(AbortSignal));
     expect(props.onPreviewChange).toHaveBeenCalledWith(
       expect.objectContaining({
         sample_size_per_tag: 600,
@@ -288,18 +288,29 @@ describe('SmartTargetingTestSamplingPreview', () => {
     ).toBe(false);
   });
 
-  it('resumes an active calculation returned by the current-job endpoint', async () => {
-    mockedApiService.getCurrentSmartTargetingTestSamplingCalculation.mockResolvedValue(
-      {
+  it('polls an active calculation from the base endpoint after entering the step', async () => {
+    const props = defaultProps();
+    jestGlobals.useFakeTimers();
+    mockedApiService.getCurrentSmartTargetingTestSamplingCalculation
+      .mockResolvedValueOnce({
         success: true,
         message: 'ok',
         data: calculation({ status: 'calculating' }) as any,
-      }
-    );
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        message: 'ok',
+        data: calculation({ status: 'calculating' }) as any,
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        message: 'ok',
+        data: completedCalculation as any,
+      });
 
-    render(<SmartTargetingTestSamplingPreview {...defaultProps()} />);
+    render(<SmartTargetingTestSamplingPreview {...props} />);
 
-    const indicator = await screen.findByRole('status', {
+    const indicator = await screen.findByRole('button', {
       name: copy.checkingAvailability,
     });
     expect(indicator.getAttribute('aria-busy')).toBe('true');
@@ -309,6 +320,44 @@ describe('SmartTargetingTestSamplingPreview', () => {
     expect(
       mockedApiService.startSmartTargetingTestSamplingCalculation
     ).not.toHaveBeenCalled();
+
+    await act(async () => {
+      jestGlobals.advanceTimersByTime(10_000);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(
+      mockedApiService.getCurrentSmartTargetingTestSamplingCalculation
+    ).toHaveBeenCalledTimes(2);
+    expect(
+      screen
+        .getByRole('button', { name: copy.checkingAvailability })
+        .getAttribute('aria-busy')
+    ).toBe('true');
+    expect(screen.getByTestId('smart-targeting-sampling-spinner')).toBeTruthy();
+    expect(props.onPreviewChange).not.toHaveBeenCalled();
+
+    await act(async () => {
+      jestGlobals.advanceTimersByTime(10_000);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(
+      mockedApiService.getCurrentSmartTargetingTestSamplingCalculation
+    ).toHaveBeenCalledTimes(3);
+    expect(props.onPreviewChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sample_size_per_tag: 600,
+        effective_audience_count: 600,
+        campaign_cost: 84000,
+      }),
+      'campaign-uuid'
+    );
+    expect(
+      screen.queryByRole('button', { name: copy.checkingAvailability })
+    ).toBeNull();
   });
 
   it('reconciles an ambiguous submit failure instead of submitting twice', async () => {
@@ -337,7 +386,7 @@ describe('SmartTargetingTestSamplingPreview', () => {
     );
     fireEvent.click(button);
 
-    const indicator = await screen.findByRole('status', {
+    const indicator = await screen.findByRole('button', {
       name: copy.checkingAvailability,
     });
     expect(indicator.getAttribute('aria-busy')).toBe('true');
@@ -389,15 +438,15 @@ describe('SmartTargetingTestSamplingPreview', () => {
         data: calculation() as any,
       }
     );
-    mockedApiService.getSmartTargetingTestSamplingCalculationById.mockResolvedValue(
-      {
+    mockedApiService.getCurrentSmartTargetingTestSamplingCalculation
+      .mockResolvedValueOnce(notFoundResponse)
+      .mockResolvedValueOnce({
         success: false,
         message: 'not found',
         error: {
           code: 'SMART_TARGETING_TEST_SAMPLING_CALCULATION_NOT_FOUND',
         },
-      }
-    );
+      });
 
     render(<SmartTargetingTestSamplingPreview {...defaultProps()} />);
     const button = screen.getByRole('button', {
