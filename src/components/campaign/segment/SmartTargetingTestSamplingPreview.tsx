@@ -429,9 +429,8 @@ const SmartTargetingTestSamplingPreview: React.FC<
       let response;
       try {
         response =
-          await apiService.getSmartTargetingTestSamplingCalculationById(
+          await apiService.getCurrentSmartTargetingTestSamplingCalculation(
             jobUuid,
-            calculationId,
             requestController.signal
           );
       } catch {
@@ -777,9 +776,8 @@ const SmartTargetingTestSamplingPreview: React.FC<
                     : ''}
         </p>
         {hasActiveCalculation ? (
-          <div
-            className='inline-flex items-center justify-center gap-2 rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white opacity-50'
-            role='status'
+          <Button
+            disabled
             aria-label={copy.checkingAvailability}
             aria-busy='true'
           >
@@ -788,8 +786,8 @@ const SmartTargetingTestSamplingPreview: React.FC<
               aria-hidden='true'
               data-testid='smart-targeting-sampling-spinner'
             />
-            {copy.checkingAvailability}
-          </div>
+            <span className='ml-2'>{copy.checkingAvailability}</span>
+          </Button>
         ) : (
           <Button
             onClick={() => void handlePreview()}
