@@ -288,6 +288,62 @@ describe('SmartTargetingTestSamplingPreview', () => {
     ).toBe(false);
   });
 
+  it('shows the loading icon while campaign preparation is still pending', async () => {
+    let resolvePreparation: (value: {
+      success: boolean;
+      uuid: string;
+    }) => void = () => {};
+    const props = defaultProps();
+    mockedApiService.startSmartTargetingTestSamplingCalculation.mockResolvedValue(
+      {
+        success: false,
+        message: 'failed',
+        error: { code: 'SMART_TARGETING_TEST_SAMPLING_FAILED' },
+      }
+    );
+    props.prepareCampaign.mockImplementation(
+      () =>
+        new Promise(resolve => {
+          resolvePreparation = resolve;
+        })
+    );
+
+    render(<SmartTargetingTestSamplingPreview {...props} />);
+    const button = screen.getByRole('button', {
+      name: copy.checkAvailability,
+    });
+    await waitFor(() =>
+      expect((button as HTMLButtonElement).disabled).toBe(false)
+    );
+
+    fireEvent.click(button);
+
+    const submittingButton = screen.getByRole('button', {
+      name: copy.checkingAvailability,
+    });
+    expect(submittingButton.getAttribute('aria-busy')).toBe('true');
+    expect(screen.getByTestId('smart-targeting-sampling-spinner')).toBeTruthy();
+
+    await act(async () => {
+      resolvePreparation({
+        success: true,
+        uuid: 'campaign-uuid',
+      });
+      await Promise.resolve();
+    });
+
+    await waitFor(() =>
+      expect(
+        (
+          screen.getByRole('button', {
+            name: copy.checkAvailability,
+          }) as HTMLButtonElement
+        ).disabled
+      ).toBe(false)
+    );
+    expect(screen.queryByTestId('smart-targeting-sampling-spinner')).toBeNull();
+  });
+
   it('polls an active calculation from the base endpoint after entering the step', async () => {
     const props = defaultProps();
     jestGlobals.useFakeTimers();
