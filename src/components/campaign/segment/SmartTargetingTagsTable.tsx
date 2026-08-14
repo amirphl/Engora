@@ -128,16 +128,18 @@ const normalizeTagIds = (value: unknown): number[] => {
 };
 
 const normalizePagination = (
-  pagination: Partial<PaginationInfo> | null | undefined,
-  fallbackLimit: number
+  pagination: (Partial<PaginationInfo> & { total?: number }) | null | undefined,
+  fallbackLimit: number,
+  minimumTotalItems = 0
 ): PaginationInfo => {
   const page = normalizePositiveInteger(pagination?.page) ?? 1;
   const limit = normalizePositiveInteger(pagination?.limit) ?? fallbackLimit;
+  const reportedTotalItems = pagination?.total_items ?? pagination?.total;
   const totalItems =
-    typeof pagination?.total_items === 'number' &&
-    Number.isFinite(pagination.total_items)
-      ? Math.max(0, pagination.total_items)
-      : 0;
+    typeof reportedTotalItems === 'number' &&
+    Number.isFinite(reportedTotalItems)
+      ? Math.max(0, reportedTotalItems, minimumTotalItems)
+      : Math.max(0, minimumTotalItems);
   const totalPages =
     normalizePositiveInteger(pagination?.total_pages) ??
     Math.max(1, Math.ceil(totalItems / Math.max(limit, 1)));
@@ -483,7 +485,9 @@ const SmartTargetingTagsTable: React.FC<SmartTargetingTagsTableProps> = ({
       setRows(currentRows =>
         page === 1 ? nextRows : appendUniqueRows(currentRows, nextRows)
       );
-      setPagination(normalizePagination(response.data.pagination, pageSize));
+      setPagination(
+        normalizePagination(response.data.pagination, pageSize, nextRows.length)
+      );
       setEvaluationAvailable(response.data.evaluation_available === true);
       setEffectiveSortBy(response.data.effective_sort_by || '');
       setEffectiveSortDirection(response.data.effective_sort_direction || '');
@@ -577,11 +581,13 @@ const SmartTargetingTagsTable: React.FC<SmartTargetingTagsTableProps> = ({
           return;
         }
 
+        const firstRows = normalizeRows(firstResponse.data.items);
         const firstPagination = normalizePagination(
           firstResponse.data.pagination,
-          100
+          100,
+          firstRows.length
         );
-        const orderedIds = normalizeRows(firstResponse.data.items)
+        const orderedIds = firstRows
           .map(row => row.tag_id)
           .filter(tagId => requestedSet.has(tagId));
         const found = new Set(orderedIds);
@@ -808,11 +814,13 @@ const SmartTargetingTagsTable: React.FC<SmartTargetingTagsTableProps> = ({
         return null;
       }
 
+      const normalizedRows = normalizeRows(response.data.items);
       return {
-        rows: normalizeRows(response.data.items),
+        rows: normalizedRows,
         pagination: normalizePagination(
           response.data.pagination,
-          requestPageSize
+          requestPageSize,
+          normalizedRows.length
         ),
       };
     };
@@ -941,13 +949,20 @@ const SmartTargetingTagsTable: React.FC<SmartTargetingTagsTableProps> = ({
 
         // The auto-selection response is authoritative; ignore any older list
         // response that was started before the server replaced the selection.
-        requestSeqRef.current += 1;
-        hasUserEditedRef.current = false;
-        onSelectionChange(
-          normalizeTagIds(response.data.selected_tag_ids),
-          Math.max(0, response.data.summary?.selected_raw_capacity ?? 0),
-          'server'
+        const nextIds = normalizeTagIds(response.data.selected_tag_ids);
+        const nextRawCapacity = Math.max(
+          0,
+          response.data.summary?.selected_raw_capacity ?? 0
         );
+
+        requestSeqRef.current += 1;
+        // Keep the mutation response authoritative for this table context.
+        // A following list request can be served from a stale read replica (or
+        // omit selection metadata) and must not immediately clear the result.
+        hasUserEditedRef.current = true;
+        selectedTagIdsRef.current = nextIds;
+        selectedRawCapacityRef.current = nextRawCapacity;
+        onSelectionChange(nextIds, nextRawCapacity, 'server');
         setRefreshKey(value => value + 1);
         return;
       }
