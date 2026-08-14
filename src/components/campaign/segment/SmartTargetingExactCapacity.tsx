@@ -452,7 +452,7 @@ const SmartTargetingExactCapacity: React.FC<
           return;
         }
         setRequestError(copy.pollingRetry);
-        schedule(SMART_TARGETING_CAPACITY_POLL_INTERVAL_MS * retryCount);
+        schedule(SMART_TARGETING_CAPACITY_POLL_INTERVAL_MS);
         return;
       }
 
@@ -875,6 +875,7 @@ const SmartTargetingExactCapacity: React.FC<
     isSmartTargetingCapacityCalculated(calculation) &&
     !isStale;
   const isFailed = isSmartTargetingCapacityFailed(calculation);
+  const isCalculationPending = isStarting || isActive;
   const hasUsableResult =
     isCalculated &&
     typeof calculation?.usable_unique_audience_count === 'number';
@@ -884,8 +885,7 @@ const SmartTargetingExactCapacity: React.FC<
     selectedTagIds.length === 0 ||
     selectionOrderIsPending ||
     isLoadingCurrent ||
-    isStarting ||
-    isActive;
+    isCalculationPending;
 
   const statusLabel = isStale
     ? copy.recalculationRequired
@@ -948,30 +948,25 @@ const SmartTargetingExactCapacity: React.FC<
           <span className='font-medium'>{copy.statusLabel}:</span>{' '}
           <span>{isLoadingCurrent ? copy.loadingCurrent : statusLabel}</span>
         </div>
-        {isActive ? (
-          <div
-            className='inline-flex items-center justify-center gap-2 rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white opacity-50'
-            role='status'
-            aria-label={copy.calculating}
-            aria-busy='true'
-          >
-            <RefreshCw
-              className='h-4 w-4 animate-spin'
-              aria-hidden='true'
-              data-testid='smart-targeting-capacity-spinner'
-            />
-            {copy.calculating}
-          </div>
-        ) : (
-          <Button
-            onClick={() => void handleCalculate()}
-            disabled={calculateDisabled}
-            aria-describedby='smart-targeting-capacity-guidance'
-            aria-busy={isLoadingCurrent || isStarting}
-          >
-            {isStarting ? copy.starting : copy.calculate}
-          </Button>
-        )}
+        <Button
+          onClick={() => void handleCalculate()}
+          disabled={calculateDisabled}
+          aria-describedby='smart-targeting-capacity-guidance'
+          aria-busy={isCalculationPending}
+        >
+          {isCalculationPending ? (
+            <span className='inline-flex items-center gap-2'>
+              <RefreshCw
+                className='h-4 w-4 animate-spin'
+                aria-hidden='true'
+                data-testid='smart-targeting-capacity-spinner'
+              />
+              {isStarting ? copy.starting : copy.calculating}
+            </span>
+          ) : (
+            copy.calculate
+          )}
+        </Button>
       </div>
 
       <div
