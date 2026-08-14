@@ -406,6 +406,33 @@ describe('SmartTargetingTagsTable', () => {
     expect(screen.getByTestId('selection').textContent).toContain('2');
   });
 
+  it('auto-selects tags when pagination reports total instead of total_items', async () => {
+    const legacyPaginationResponse = response([tag(1, 'Available tag', 10)]);
+    legacyPaginationResponse.data.pagination = {
+      page: 1,
+      limit: 20,
+      total: 1,
+      total_pages: 1,
+    } as any;
+    mockedApiService.listBundleSmartTargetingTags.mockResolvedValue(
+      legacyPaginationResponse as any
+    );
+
+    render(<SelectionHarness />);
+    await screen.findByRole('checkbox', { name: 'Available tag' });
+
+    await change(
+      screen.getByRole('spinbutton', { name: copy.autoSelectLabel }),
+      '1'
+    );
+    await click(screen.getByRole('button', { name: copy.autoSelectButton }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('selection').textContent).toBe('1');
+    });
+    expect(screen.queryByText(copy.autoCountTooLarge)).toBeNull();
+  });
+
   it('collects all required bundle pages for auto-selection', async () => {
     mockedApiService.listBundleSmartTargetingTags.mockImplementation(
       async (_bundleId, params) =>
@@ -478,6 +505,51 @@ describe('SmartTargetingTagsTable', () => {
     await waitFor(() => {
       expect(screen.getByTestId('selection').textContent).toContain('1');
     });
+  });
+
+  it('keeps the campaign auto-selection when the following tag list is stale', async () => {
+    mockedApiService.listCampaignSmartTargetingTags.mockResolvedValue(
+      response([tag(1, 'Persisted tag', 10)]) as any
+    );
+    mockedApiService.autoSelectCampaignSmartTargetingTags.mockResolvedValue({
+      success: true,
+      message: 'ok',
+      data: {
+        selected_tag_ids: [1],
+        summary: {
+          selected_tag_count: 1,
+          selected_raw_capacity: 10,
+        },
+      },
+    } as any);
+
+    render(
+      <SelectionHarness campaignUuid='campaign-uuid' useCampaignEndpoints />
+    );
+    await screen.findByRole('checkbox', { name: 'Persisted tag' });
+
+    await change(
+      screen.getByRole('spinbutton', { name: copy.autoSelectLabel }),
+      '1'
+    );
+    await click(screen.getByRole('button', { name: copy.autoSelectButton }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('selection').textContent).toBe('1');
+    });
+    expect(
+      (
+        screen.getByRole('checkbox', {
+          name: 'Persisted tag',
+        }) as HTMLInputElement
+      ).checked
+    ).toBe(true);
+    await waitFor(() =>
+      expect(
+        mockedApiService.listCampaignSmartTargetingTags.mock.calls.length
+      ).toBeGreaterThan(1)
+    );
+    expect(screen.getByTestId('selection').textContent).toBe('1');
   });
 
   it('reorders selected Test tags to the active table sort order', async () => {
