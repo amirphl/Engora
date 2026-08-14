@@ -329,7 +329,7 @@ describe('SmartTargetingExactCapacity', () => {
     expect(props.onSelectionPersisted).toHaveBeenCalledWith([10], 1500);
   });
 
-  it('waits more than ten seconds before polling and stops on completion', async () => {
+  it('polls every ten seconds and stops on completion', async () => {
     jestGlobals.useFakeTimers();
     mockedApiService.getCurrentSmartTargetingCapacityCalculation
       .mockResolvedValueOnce({
@@ -363,13 +363,13 @@ describe('SmartTargetingExactCapacity', () => {
       await Promise.resolve();
     });
 
-    act(() => jestGlobals.advanceTimersByTime(10_000));
+    act(() => jestGlobals.advanceTimersByTime(9_999));
     expect(
       mockedApiService.getSmartTargetingCapacityCalculationById
     ).not.toHaveBeenCalled();
 
     await act(async () => {
-      jestGlobals.advanceTimersByTime(2_000);
+      jestGlobals.advanceTimersByTime(1);
       await Promise.resolve();
       await Promise.resolve();
     });
@@ -410,9 +410,53 @@ describe('SmartTargetingExactCapacity', () => {
     expect(
       await screen.findByTestId('smart-targeting-capacity-spinner')
     ).toBeTruthy();
-    const indicator = screen.getByRole('status', { name: copy.calculating });
+    const indicator = screen.getByRole('button', { name: copy.calculating });
     expect(indicator.getAttribute('aria-busy')).toBe('true');
     expect(screen.queryByRole('button', { name: copy.calculate })).toBeNull();
+  });
+
+  it('shows the loading icon while the calculation request is still starting', async () => {
+    let resolveStart: (value: any) => void = () => {};
+    mockedApiService.startSmartTargetingCapacityCalculation.mockImplementation(
+      () =>
+        new Promise(resolve => {
+          resolveStart = resolve;
+        })
+    );
+
+    render(<SmartTargetingExactCapacity {...defaultProps()} />);
+    const button = screen.getByRole('button', { name: copy.calculate });
+    await waitFor(() =>
+      expect((button as HTMLButtonElement).disabled).toBe(false)
+    );
+
+    fireEvent.click(button);
+
+    const startingButton = await screen.findByRole('button', {
+      name: copy.starting,
+    });
+    expect(startingButton.getAttribute('aria-busy')).toBe('true');
+    expect(screen.getByTestId('smart-targeting-capacity-spinner')).toBeTruthy();
+
+    await act(async () => {
+      resolveStart({
+        success: false,
+        message: 'failed',
+        error: { code: 'SMART_TARGETING_CAPACITY_FAILED' },
+      });
+      await Promise.resolve();
+    });
+
+    await waitFor(() =>
+      expect(
+        (
+          screen.getByRole('button', {
+            name: copy.calculate,
+          }) as HTMLButtonElement
+        ).disabled
+      ).toBe(false)
+    );
+    expect(screen.queryByTestId('smart-targeting-capacity-spinner')).toBeNull();
   });
 
   it.each(['calculated', 'failed'])(
@@ -471,7 +515,7 @@ describe('SmartTargetingExactCapacity', () => {
     });
 
     await act(async () => {
-      jestGlobals.advanceTimersByTime(12_000);
+      jestGlobals.advanceTimersByTime(10_000);
       await Promise.resolve();
       await Promise.resolve();
     });
@@ -507,7 +551,7 @@ describe('SmartTargetingExactCapacity', () => {
     expect(screen.getByText(`800 ${copy.audiences}`)).toBeTruthy();
 
     await act(async () => {
-      jestGlobals.advanceTimersByTime(12_000);
+      jestGlobals.advanceTimersByTime(10_000);
       await Promise.resolve();
       await Promise.resolve();
     });
