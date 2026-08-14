@@ -60,9 +60,19 @@ const ActionModal: React.FC<ActionModalProps> = ({
 
   return (
     <div className='fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-4'>
-      <div className='flex max-h-[min(100dvh,100svh)] w-full flex-col overflow-hidden rounded-none bg-white shadow-lg sm:max-h-[calc(100dvh-2rem)] sm:max-w-4xl sm:rounded'>
+      <div
+        className='flex h-screen max-h-screen w-full flex-col overflow-hidden rounded-none bg-white shadow-lg supports-[height:100dvh]:h-[100dvh] supports-[height:100dvh]:max-h-[100dvh] sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:max-w-4xl sm:rounded'
+        role='dialog'
+        aria-modal='true'
+        aria-labelledby='campaign-action-modal-title'
+      >
         <div className='mb-0 flex shrink-0 items-center justify-between border-b border-gray-200 p-4 sm:p-5'>
-          <h2 className='text-lg font-semibold'>{modalTitle}</h2>
+          <h2
+            id='campaign-action-modal-title'
+            className='text-lg font-semibold'
+          >
+            {modalTitle}
+          </h2>
           <button
             type='button'
             className='text-gray-500'
@@ -73,7 +83,10 @@ const ActionModal: React.FC<ActionModalProps> = ({
           </button>
         </div>
 
-        <div className='min-h-0 space-y-3 overflow-y-auto p-4 sm:p-5'>
+        <div
+          className='min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-4 sm:p-5'
+          data-testid='campaign-action-modal-scroll-area'
+        >
           <div className='grid grid-cols-1 gap-x-6 gap-y-2 text-sm text-gray-700 md:grid-cols-2'>
             <div>
               <span className='font-medium'>{copy.table.headers.id}:</span>{' '}
@@ -189,27 +202,30 @@ const ActionModal: React.FC<ActionModalProps> = ({
           {actionError ? (
             <div className='text-sm text-red-600'>{actionError}</div>
           ) : null}
+        </div>
 
-          <div className='flex flex-wrap justify-end gap-3 border-t border-gray-100 pt-4'>
-            <button
-              type='button'
-              className='rounded border px-4 py-2'
-              onClick={onClose}
-              disabled={actionSubmitting}
-            >
-              {copy.common.cancel}
-            </button>
-            <button
-              type='button'
-              className={`${submitClass} rounded px-4 py-2 text-white disabled:opacity-60`}
-              onClick={onSubmit}
-              disabled={
-                actionSubmitting || (isCommentRequired && !actionComment.trim())
-              }
-            >
-              {actionSubmitting ? copy.modal.submitting : submitText}
-            </button>
-          </div>
+        <div
+          className='flex shrink-0 gap-3 border-t border-gray-200 bg-white px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] sm:justify-end sm:px-5 sm:py-4'
+          data-testid='campaign-action-modal-footer'
+        >
+          <button
+            type='button'
+            className='min-h-11 flex-1 rounded border px-4 py-2 sm:flex-none'
+            onClick={onClose}
+            disabled={actionSubmitting}
+          >
+            {copy.common.cancel}
+          </button>
+          <button
+            type='button'
+            className={`${submitClass} min-h-11 flex-1 rounded px-4 py-2 text-white disabled:opacity-60 sm:flex-none`}
+            onClick={onSubmit}
+            disabled={
+              actionSubmitting || (isCommentRequired && !actionComment.trim())
+            }
+          >
+            {actionSubmitting ? copy.modal.submitting : submitText}
+          </button>
         </div>
       </div>
     </div>
