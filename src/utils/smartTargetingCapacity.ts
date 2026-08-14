@@ -3,7 +3,7 @@ import {
   SmartTargetingCapacityCalculationResponse,
 } from '../types/campaign';
 
-export const SMART_TARGETING_CAPACITY_POLL_INTERVAL_MS = 12_000;
+export const SMART_TARGETING_CAPACITY_POLL_INTERVAL_MS = 10_000;
 export const SMART_TARGETING_CAPACITY_MAX_POLL_RETRIES = 3;
 
 const SCORE_CLASS_ORDER: AudienceGrade[] = ['A', 'B', 'C'];
