@@ -24,8 +24,8 @@ const calculation = {
 };
 
 describe('Smart Targeting exact-capacity helpers', () => {
-  it('uses a polling interval greater than ten seconds', () => {
-    expect(SMART_TARGETING_CAPACITY_POLL_INTERVAL_MS).toBeGreaterThan(10_000);
+  it('polls every ten seconds', () => {
+    expect(SMART_TARGETING_CAPACITY_POLL_INTERVAL_MS).toBe(10_000);
   });
 
   it('treats an omitted score restriction and all classes as equivalent', () => {
