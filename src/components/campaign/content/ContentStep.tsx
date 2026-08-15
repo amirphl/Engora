@@ -33,6 +33,9 @@ import {
   LINK_PLACEHOLDER,
   normalizeLinkPlaceholder,
 } from '../../../utils/campaignUtils';
+import { containsForbiddenContent } from '../../../utils/forbiddenContent';
+
+const FORBIDDEN_CONTENT_CHECK_DELAY_MS = 500;
 
 const ContentStep: React.FC = () => {
   const { campaignData, updateContent } = useCampaign();
@@ -47,6 +50,7 @@ const ContentStep: React.FC = () => {
   const { uploadMedia, isUploading } = useMediaUpload(accessToken);
   const { navigate } = useNavigation();
   const platform = campaignData.segment.platform || 'sms';
+  const [forbiddenContentError, setForbiddenContentError] = useState('');
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewName, setPreviewName] = useState<string | null>(null);
   const [previewType, setPreviewType] = useState<CampaignMediaType | null>(
@@ -64,6 +68,23 @@ const ContentStep: React.FC = () => {
   useEffect(() => {
     showErrorRef.current = showError;
   }, [showError]);
+
+  useEffect(() => {
+    if (platform !== 'sms' || !campaignData.content.text.trim()) {
+      setForbiddenContentError('');
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setForbiddenContentError(
+        containsForbiddenContent(campaignData.content.text)
+          ? t.forbiddenContent
+          : ''
+      );
+    }, FORBIDDEN_CONTENT_CHECK_DELAY_MS);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [campaignData.content.text, platform, t.forbiddenContent]);
 
   // Custom hooks for business logic
   const { linkError, handleLinkChange, clearError } = useUrlValidation(
@@ -454,6 +475,7 @@ const ContentStep: React.FC = () => {
               withLinkExplanation={t.withLinkExplanation}
               withoutLinkExplanation={t.withoutLinkExplanation}
               textExceedsLimit={t.textExceedsLimit}
+              error={forbiddenContentError}
             />
           ) : (
             renderPlatformMessageCard()
