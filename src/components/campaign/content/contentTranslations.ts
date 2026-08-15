@@ -60,6 +60,8 @@ const contentEn = {
     'Without link: starts at 6 chars (cancellation append)',
   textExceedsLimit:
     '⚠️ Text exceeds maximum length. Please shorten your message.',
+  forbiddenContent:
+    'This message contains a prohibited word or phrase. Please revise it before continuing.',
   nonSmsTextExceedsLimit: 'Text exceeds maximum length (1000 characters).',
 
   // Line number section
@@ -157,6 +159,8 @@ const contentFa = {
     'بدون لینک: از ۶ کاراکتر شروع می‌شود (اضافه کردن لغو۱۱)',
   textExceedsLimit:
     '⚠️ متن از حداکثر طول مجاز فراتر رفته است. لطفاً پیام خود را کوتاه کنید.',
+  forbiddenContent:
+    'این پیام شامل کلمه یا عبارت غیرمجاز است. پیش از ادامه، متن را ویرایش کنید.',
   nonSmsTextExceedsLimit:
     'متن از حداکثر طول مجاز (۱۰۰۰ کاراکتر) فراتر رفته است.',
 
