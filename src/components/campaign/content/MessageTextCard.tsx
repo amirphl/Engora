@@ -33,6 +33,7 @@ interface MessageTextCardProps {
   withLinkExplanation: string;
   withoutLinkExplanation: string;
   textExceedsLimit: string;
+  error?: string;
 }
 
 const MessageTextCard: React.FC<MessageTextCardProps> = ({
@@ -59,6 +60,7 @@ const MessageTextCard: React.FC<MessageTextCardProps> = ({
   withLinkExplanation,
   withoutLinkExplanation,
   textExceedsLimit,
+  error,
 }) => {
   const charCountResult = calculateTotalCharacterCount(
     text || '',
@@ -89,6 +91,7 @@ const MessageTextCard: React.FC<MessageTextCardProps> = ({
             placeholder={placeholder}
             value={text || ''}
             onChange={onTextChange}
+            error={error}
             required
             ref={textAreaRef}
             // inputClassName='pb-8 pr-12'
