@@ -248,6 +248,32 @@ describe('campaignUtils content validation', () => {
     ).toBe(false);
   });
 
+  it('rejects prohibited content for SMS campaigns only', () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-07-27T08:00:00.000Z'));
+
+    const smsResult = validateCampaignContent(
+      {
+        text: 'Learn about bitcoin today',
+        insertLink: false,
+      },
+      'sms'
+    );
+    const baleResult = validateCampaignContent(
+      {
+        text: 'Learn about bitcoin today',
+        insertLink: false,
+      },
+      'bale'
+    );
+
+    expect(smsResult).toEqual({
+      isValid: false,
+      error: 'Message contains a prohibited word or phrase',
+    });
+    expect(baleResult).toEqual({ isValid: true, error: null });
+  });
+
   it('accepts an explicit schedule at least 10 minutes ahead', () => {
     jest.useFakeTimers();
     jest.setSystemTime(new Date('2026-07-27T08:00:00.000Z'));
