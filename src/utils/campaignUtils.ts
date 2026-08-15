@@ -1,4 +1,5 @@
 import { CampaignData, UpdateSMSCampaignRequest } from '../types/campaign';
+import { containsForbiddenContent } from './forbiddenContent';
 
 /**
  * Campaign utility functions for character counting, validation, and calculations
@@ -214,6 +215,13 @@ export const validateCampaignContent = (
   // Check if text exists
   if (!content.text?.trim()) {
     return { isValid: false, error: 'Please enter text content' };
+  }
+
+  if (platform === 'sms' && containsForbiddenContent(content.text)) {
+    return {
+      isValid: false,
+      error: 'Message contains a prohibited word or phrase',
+    };
   }
 
   // Check if link is provided when link insertion is enabled
