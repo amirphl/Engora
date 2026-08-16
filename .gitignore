@@ -167,5 +167,7 @@ data/
 src/data/*
 !src/data/iranCities.ts
 !src/data/layer3Stats.ts
+!src/data/forbidden.txt
+!src/data/generatedForbiddenTerms.ts
 
 *.mp4
