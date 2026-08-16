@@ -88,7 +88,7 @@ describe('campaignUtils SMS counting', () => {
   });
 
   it('normalizes placeholders from every supported short-link domain', () => {
-    expect(normalizeLinkPlaceholder('joinsahel.ir/xxxxxx')).toBe('{YOUR_LINK}');
+    expect(normalizeLinkPlaceholder('jzbe.ir/xxxxxx')).toBe('{YOUR_LINK}');
   });
 });
 
