@@ -159,7 +159,7 @@ export const translations = {
       },
       domain: {
         jo1n: 'jo1n.ir',
-        joinsahel: 'joinsahel.ir',
+        joinsahel: 'jzbe.ir',
       },
       messages: {
         success: 'Short links created successfully',
@@ -894,7 +894,7 @@ export const translations = {
       },
       domain: {
         jo1n: 'jo1n.ir',
-        joinsahel: 'joinsahel.ir',
+        joinsahel: 'jzbe.ir',
       },
       messages: {
         success: 'لینک‌های کوتاه با موفقیت ایجاد شد',
