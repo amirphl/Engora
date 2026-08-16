@@ -387,7 +387,7 @@ const AdminShortLinkManagementPage: React.FC = () => {
             <option value='https://jo1n.ir'>
               {t('adminShortLinks.domain.jo1n')}
             </option>
-            <option value='https://joinsahel.ir'>
+            <option value='https://jzbe.ir'>
               {t('adminShortLinks.domain.joinsahel')}
             </option>
           </select>
