@@ -21,7 +21,7 @@ const response: GetCampaignResponse = {
   sex: 'all',
   city: ['Tehran', 'Shiraz'],
   adlink: 'https://example.com/{uid}',
-  content: 'Visit joinsahel.ir/xxxxxx',
+  content: 'Visit jzbe.ir/xxxxxx',
   short_link_domain: null,
   job_category: 'Technology',
   job: 'Engineer',
