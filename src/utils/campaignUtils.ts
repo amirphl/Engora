@@ -12,7 +12,7 @@ export const LINK_PLACEHOLDER = '{YOUR_LINK}';
 export const DEFAULT_SHORT_LINK_DOMAIN = 'jo1n.ir';
 export const ALLOWED_SHORT_LINK_DOMAINS = [
   DEFAULT_SHORT_LINK_DOMAIN,
-  'joinsahel.ir',
+  'jzbe.ir',
 ] as const;
 export const MIN_SCHEDULE_LEAD_TIME_MS = 10 * 60 * 1000;
 export const DEFAULT_FINALIZE_SCHEDULE_DELAY_MS = 20 * 60 * 1000;
