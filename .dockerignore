@@ -160,6 +160,7 @@ docs/
 # Scripts are excluded by default; keep build-time npm lifecycle dependencies.
 scripts/
 !scripts/prepare-csp-dependencies.mjs
+!scripts/generate-forbidden-terms.mjs
 
 # Configuration files that might contain secrets
 *.config.js
